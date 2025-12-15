@@ -41,12 +41,20 @@ impl Engine {
         return y * self.width + x;
     }
 
-    pub fn place_stone(&mut self, y: usize, x: usize, stone: Stone) {
+    pub fn place_stone(&mut self, y: usize, x: usize, stone: Stone) -> Result<(), &'static str> {
         let idx = self.xy_to_idx(y, x);
         debug_assert!(idx < self.board.len());
 
+        // 禁止下到已有的棋子上
+        if let Some(_) = self.board[idx] {
+            return Err("禁止下到已有的棋子上");
+        }
+        // TODO 禁止使己方气尽
+
+        // TODO 禁止全局同形
+
         self.board[idx] = Some(stone);
-        // TODO error case
+        Ok(())
     }
 
     pub fn width(&self) -> usize {
@@ -54,7 +62,6 @@ impl Engine {
     }
 
     pub fn board(&self) -> &Board {
-        // TODO return iter
         &self.board
     }
 }

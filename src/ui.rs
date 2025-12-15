@@ -1,4 +1,9 @@
-use cursive::{Cursive, CursiveExt, event::Key, view::Nameable, views::TextView};
+use cursive::{
+    Cursive, CursiveExt,
+    event::Key,
+    view::Nameable,
+    views::{Dialog, TextView},
+};
 
 use crate::engine::{Engine, Stone};
 
@@ -100,11 +105,24 @@ fn move_cursor(siv: &mut Cursive, dy: isize, dx: isize) {
 }
 
 fn place_stone(siv: &mut Cursive) {
-    let gs: &mut GameState = siv.user_data().unwrap();
-    gs.engine
-        .place_stone(gs.cursor_y, gs.cursor_x, gs.next_stone);
-    gs.next_stone = gs.next_stone.next();
-    refresh_board(siv);
+    let result = siv
+        .with_user_data(|gs: &mut GameState| {
+            gs.engine
+                .place_stone(gs.cursor_y, gs.cursor_x, gs.next_stone)
+        })
+        .unwrap();
+
+    match result {
+        Err(msg) => {
+            siv.add_layer(Dialog::info(msg));
+        }
+        Ok(()) => {
+            siv.with_user_data(|gs: &mut GameState| {
+                gs.next_stone = gs.next_stone.next();
+            });
+            refresh_board(siv);
+        }
+    }
 }
 
 pub fn run_front_end(engine: Engine) {
