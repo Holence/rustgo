@@ -36,6 +36,19 @@ impl Stone {
     }
 }
 
+// 19x19棋盘的星位
+const STAR: [(usize, usize); 9] = [
+    (3, 3),
+    (3, 15),
+    (15, 3),
+    (15, 15),
+    (3, 9),
+    (9, 3),
+    (15, 9),
+    (9, 15),
+    (9, 9),
+];
+
 fn refresh_board(siv: &mut Cursive) {
     let gs: &mut GameState = siv.user_data().unwrap();
     let engine = &gs.engine;
@@ -45,13 +58,21 @@ fn refresh_board(siv: &mut Cursive) {
     let mut out = String::new();
 
     for y in 0..width {
+        out.push(' ');
         for x in 0..width {
             if x == gs.cursor_x && y == gs.cursor_y {
                 out.push('x');
             } else {
                 match board[y * width + x] {
                     Some(stone) => out.push(stone.char()),
-                    None => out.push('·'),
+                    None => {
+                        if width == 19 && STAR.contains(&(y, x)) {
+                            // 星位
+                            out.push('+');
+                        } else {
+                            out.push('·')
+                        }
+                    }
                 }
             }
             out.push(' ');
