@@ -1,4 +1,25 @@
-use std::ops::{Deref, DerefMut};
+use std::{
+    fmt::Display,
+    ops::{Deref, DerefMut},
+};
+
+// TODO a coord mod
+// TODO translate 1-1 coord and A1 coord
+pub struct Coord {
+    y: usize,
+    x: usize,
+}
+
+impl Display for Coord {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[{}, {}]", self.x, self.y)
+    }
+}
+
+pub struct PlaceStoneAction {
+    pub place: Coord,      // 落子坐标
+    pub eaten: Vec<Coord>, // 吃子坐标
+}
 
 #[derive(Clone, Copy)]
 pub enum Stone {
@@ -41,7 +62,12 @@ impl Engine {
         return y * self.width + x;
     }
 
-    pub fn place_stone(&mut self, y: usize, x: usize, stone: Stone) -> Result<(), &'static str> {
+    pub fn place_stone(
+        &mut self,
+        y: usize,
+        x: usize,
+        stone: Stone,
+    ) -> Result<PlaceStoneAction, &'static str> {
         let idx = self.xy_to_idx(y, x);
         debug_assert!(idx < self.board.len());
 
@@ -54,7 +80,10 @@ impl Engine {
         // TODO 禁止全局同形
 
         self.board[idx] = Some(stone);
-        Ok(())
+        Ok(PlaceStoneAction {
+            place: Coord { y, x },
+            eaten: vec![], // TODO eaten
+        })
     }
 
     pub fn width(&self) -> usize {

@@ -1,2 +1,3 @@
 pub mod engine;
-pub mod ui;
+pub mod model;
+pub mod view;
