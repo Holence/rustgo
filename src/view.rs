@@ -6,18 +6,17 @@ use cursive::{
     views::TextView,
 };
 
-use crate::engine::Stone;
 use crate::model::Game;
 
 pub struct BoardView {
     game: Game,
 }
 
-const X_TIMES: usize = 2;
-const CELL_PER_X: usize = 2 * X_TIMES;
-const CELL_PER_Y: usize = 1 * X_TIMES;
-const BOARD_OFFSET_X: usize = CELL_PER_X - 1;
-const BOARD_OFFSET_Y: usize = CELL_PER_Y - 1;
+const X_TIMES: usize = 1; // you can modify this
+const CELL_PER_X: usize = 2 * X_TIMES; // don't modify this
+const CELL_PER_Y: usize = 1 * X_TIMES; // don't modify this
+const BOARD_OFFSET_X: usize = CELL_PER_X - 1; // don't modify this
+const BOARD_OFFSET_Y: usize = CELL_PER_Y - 1; // don't modify this
 
 // 19x19棋盘的星位
 const STAR: [(usize, usize); 9] = [
@@ -62,9 +61,7 @@ impl BoardView {
             Ok(action) => {
                 // TODO
                 action.eaten;
-                let mut string = action.place.to_string();
-                string.push('\n');
-                EventResult::with_cb(move |s| append_log(s, &string))
+                EventResult::with_cb_once(move |s| append_log(s, action.place.to_string()))
             }
             Err(msg) => EventResult::with_cb(move |s| {
                 s.add_layer(cursive::views::Dialog::info(msg));
@@ -81,23 +78,22 @@ impl View for BoardView {
         for y in 0..size {
             for x in 0..size {
                 let idx = y * size + x;
-                let ch = match board[idx] {
+                let text = match board[idx] {
+                    Some(stone) => stone.as_str(),
                     None => {
                         if size == 19 && STAR.contains(&(x, y)) {
-                            "●"
+                            "+"
                         } else {
                             "·"
                         }
                     }
-                    Some(Stone::Black) => "⚫",
-                    Some(Stone::White) => "⚪",
                 };
                 printer.print(
                     (
                         x * CELL_PER_X + BOARD_OFFSET_X,
                         y * CELL_PER_Y + BOARD_OFFSET_Y,
                     ),
-                    ch,
+                    text,
                 );
             }
         }
@@ -131,7 +127,8 @@ impl View for BoardView {
     }
 }
 
-fn append_log(s: &mut cursive::Cursive, msg: &String) {
+fn append_log(s: &mut cursive::Cursive, mut msg: String) {
+    msg.push('\n');
     s.call_on_name("log", |view: &mut TextView| {
         view.append(msg);
     });

@@ -1,7 +1,4 @@
-use std::{
-    fmt::Display,
-    ops::{Deref, DerefMut},
-};
+use std::fmt::{Debug, Display, Write};
 
 // TODO a coord mod
 // TODO translate 1-1 coord and A1 coord
@@ -26,40 +23,54 @@ pub enum Stone {
     Black,
     White,
 }
+impl Stone {
+    #[inline]
+    pub fn as_char(&self) -> char {
+        match self {
+            Stone::Black => '●',
+            Stone::White => '○',
+        }
+    }
+
+    #[inline]
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Stone::Black => "●",
+            Stone::White => "○",
+        }
+    }
+}
+impl Display for Stone {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_char(self.as_char())
+    }
+}
+impl Debug for Stone {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Debug is the same as Display
+        Display::fmt(self, f)
+    }
+}
 
 /// 以左上角为原点，向下为+y，向右为+x
-pub struct Board(Vec<Option<Stone>>);
-// avoid writing `self.board.0`` in Engine
-impl Deref for Board {
-    type Target = Vec<Option<Stone>>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-// avoid writing `self.board.0`` in Engine
-impl DerefMut for Board {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
+type Board = Vec<Option<Stone>>;
 
 pub struct Engine {
-    width: usize,
+    size: usize,
     board: Board,
 }
 impl Engine {
-    pub fn new(width: usize) -> Self {
+    pub fn new(size: usize) -> Self {
         Engine {
-            width: width,
-            board: Board(vec![None; width * width]),
+            size: size,
+            board: vec![None; size * size],
         }
     }
 
     pub fn xy_to_idx(&self, y: usize, x: usize) -> usize {
-        debug_assert!(y < self.width);
-        debug_assert!(x < self.width);
-        return y * self.width + x;
+        debug_assert!(y < self.size);
+        debug_assert!(x < self.size);
+        return y * self.size + x;
     }
 
     pub fn place_stone(
@@ -86,11 +97,29 @@ impl Engine {
         })
     }
 
-    pub fn width(&self) -> usize {
-        self.width
+    pub fn size(&self) -> usize {
+        self.size
     }
 
     pub fn board(&self) -> &Board {
         &self.board
+    }
+
+    pub fn board_string(&self) -> String {
+        let mut s = String::with_capacity(self.size * self.size * 2);
+        let mut idx = 0;
+        for _ in 0..self.size {
+            for _ in 0..self.size {
+                let ch = match self.board[idx] {
+                    Some(stone) => stone.as_char(),
+                    None => '_',
+                };
+                s.push(ch);
+                s.push(' ');
+                idx += 1;
+            }
+            s.push('\n');
+        }
+        return s;
     }
 }

@@ -25,7 +25,7 @@ impl Game {
     }
 
     pub fn size(&self) -> usize {
-        self.engine.width()
+        self.engine.size()
     }
 
     pub fn board(&self) -> &Vec<Option<Stone>> {
