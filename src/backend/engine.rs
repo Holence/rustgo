@@ -7,19 +7,16 @@ pub struct PlaceStoneResult {
 
 pub type EngineResult = Result<PlaceStoneResult, &'static str>;
 
-/// 以左上角为原点，向下为+y，向右为+x
-type Board = Vec<Option<Stone>>;
-
 pub struct Engine {
     size: usize,
-    board: Board,
+    board: Box<[Option<Stone>]>, // 以左上角为原点，向下为+y，向右为+x
 }
 
 impl Engine {
     pub fn new(size: usize) -> Self {
         Engine {
             size: size,
-            board: vec![None; size * size],
+            board: vec![None; size * size].into_boxed_slice(),
         }
     }
 
@@ -52,7 +49,7 @@ impl Engine {
         self.size
     }
 
-    pub fn board(&self) -> &Board {
+    pub fn board(&self) -> &[Option<Stone>] {
         &self.board
     }
 

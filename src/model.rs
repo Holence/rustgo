@@ -26,7 +26,7 @@ impl Game {
         self.engine.size()
     }
 
-    pub fn board(&self) -> &Vec<Option<Stone>> {
+    pub fn board(&self) -> &[Option<Stone>] {
         self.engine.board()
     }
 
