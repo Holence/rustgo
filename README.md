@@ -7,3 +7,10 @@
   - 禁止下到已有的棋子上
   - 禁止使己方气尽
   - 禁止全局同形
+
+
+# TODO
+
+- GTP with gnugo
+- learn cfg
+  - use feature Conditional compilation

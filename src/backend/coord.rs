@@ -1,14 +1,15 @@
 use std::fmt::{Debug, Display};
 
 // TODO translate 1-1 coord and A1 coord
+#[derive(Clone, Copy)]
 pub struct Coord {
-    y: usize,
-    x: usize,
+    pub x: usize,
+    pub y: usize,
 }
 
 impl Coord {
-    pub fn new(y: usize, x: usize) -> Self {
-        Coord { y, x }
+    pub fn new(x: usize, y: usize) -> Self {
+        Coord { x, y }
     }
 }
 

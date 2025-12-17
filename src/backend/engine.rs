@@ -1,7 +1,6 @@
 use crate::{backend::Coord, backend::Stone};
 
 pub struct PlaceStoneResult {
-    pub place: Coord,      // 落子坐标
     pub eaten: Vec<Coord>, // 吃子坐标
 }
 
@@ -20,14 +19,14 @@ impl Engine {
         }
     }
 
-    pub fn xy_to_idx(&self, y: usize, x: usize) -> usize {
-        debug_assert!(y < self.size);
-        debug_assert!(x < self.size);
-        return y * self.size + x;
+    fn idx(&self, coord: Coord) -> usize {
+        debug_assert!(coord.y < self.size);
+        debug_assert!(coord.x < self.size);
+        return coord.y * self.size + coord.x;
     }
 
-    pub fn place_stone(&mut self, y: usize, x: usize, stone: Stone) -> EngineResult {
-        let idx = self.xy_to_idx(y, x);
+    pub fn place_stone(&mut self, coord: Coord, stone: Stone) -> EngineResult {
+        let idx = self.idx(coord);
         debug_assert!(idx < self.board.len());
 
         // 禁止下到已有的棋子上
@@ -40,7 +39,6 @@ impl Engine {
 
         self.board[idx] = Some(stone);
         Ok(PlaceStoneResult {
-            place: Coord::new(y, x),
             eaten: vec![], // TODO eaten
         })
     }

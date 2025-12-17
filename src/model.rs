@@ -1,4 +1,4 @@
-use crate::backend::{Engine, EngineResult, Stone};
+use crate::backend::{Coord, Engine, EngineResult, Stone};
 
 impl Stone {
     pub fn next(self) -> Stone {
@@ -30,8 +30,8 @@ impl Game {
         self.engine.board()
     }
 
-    pub fn place_stone(&mut self, y: usize, x: usize) -> EngineResult {
-        let ret = self.engine.place_stone(y, x, self.next_stone)?;
+    pub fn place_stone(&mut self, coord: Coord) -> EngineResult {
+        let ret = self.engine.place_stone(coord, self.next_stone)?;
         self.next_stone = self.next_stone.next();
         Ok(ret)
     }

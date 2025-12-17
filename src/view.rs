@@ -6,7 +6,7 @@ use cursive::{
     views::TextView,
 };
 
-use crate::model::Game;
+use crate::{backend::Coord, model::Game};
 
 pub struct BoardView {
     game: Game,
@@ -56,12 +56,13 @@ impl BoardView {
     }
 
     fn place_stone(&mut self, pos: Vec2) -> EventResult {
-        let result = self.game.place_stone(pos.y, pos.x);
+        let coord = Coord::new(pos.x, pos.y);
+        let result = self.game.place_stone(coord);
         match result {
             Ok(action) => {
                 // TODO
                 action.eaten;
-                EventResult::with_cb_once(move |s| append_log(s, action.place.to_string()))
+                EventResult::with_cb_once(move |s| append_log(s, coord.to_string()))
             }
             Err(msg) => EventResult::with_cb(move |s| {
                 s.add_layer(cursive::views::Dialog::info(msg));
