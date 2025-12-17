@@ -1,4 +1,4 @@
-use crate::{backend::Coord, backend::Stone};
+use crate::backend::{Array, Coord, Stone};
 
 pub struct PlaceStoneResult {
     pub eaten: Vec<Coord>, // 吃子坐标
@@ -6,7 +6,7 @@ pub struct PlaceStoneResult {
 
 pub type EngineResult = Result<PlaceStoneResult, &'static str>;
 
-pub type Board = Box<[Stone]>;
+pub type Board = Array<Stone>;
 
 #[derive(Clone)]
 struct GroupInfo {
@@ -30,7 +30,7 @@ pub struct Engine {
     /// 2. 在 board[idx] 处放置了棋子后, group_idx[idx] == -1, 表示 board[idx] 所对应的位置成为了棋子组
     /// 3. 在 board[idx+1] 处放置了棋子后, group_idx[idx+1] == idx, group_idx[idx] == -2, 表示 board[idx+1] 的棋子归属于 board[idx] 统帅, board[idx] 统帅着 2 个棋子
     /// 4. 若 group_idx[idx] == -num, 则表示为 board[idx] 所对应的位置是某个棋子组的首领, 它统帅着 num 个棋子
-    group_idx: Box<[isize]>,
+    group_idx: Array<isize>,
 
     /// 棋子组的额外信息
     ///
@@ -38,7 +38,7 @@ pub struct Engine {
     ///
     /// 1. 只在 group_idx[idx] == -num 时, 才有 group_info[idx] == Some(Box<GroupInfo>)
     /// 2. 其他情况, group_info[idx] == None
-    group_info: Box<[Option<Box<GroupInfo>>]>,
+    group_info: Array<Option<Box<GroupInfo>>>,
 }
 
 impl Engine {
