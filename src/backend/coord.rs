@@ -1,6 +1,5 @@
-use std::{fmt::Display, usize};
+use std::fmt::{Debug, Display};
 
-// TODO a coord mod
 // TODO translate 1-1 coord and A1 coord
 pub struct Coord {
     y: usize,
@@ -16,5 +15,12 @@ impl Coord {
 impl Display for Coord {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "[{}, {}]", self.x, self.y)
+    }
+}
+
+impl Debug for Coord {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Debug is the same as Display
+        Display::fmt(&self, f)
     }
 }

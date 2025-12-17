@@ -33,6 +33,6 @@ impl Display for Stone {
 impl Debug for Stone {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // Debug is the same as Display
-        Display::fmt(self, f)
+        Display::fmt(&self, f)
     }
 }
