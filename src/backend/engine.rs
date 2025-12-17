@@ -1,56 +1,11 @@
-use std::fmt::{Debug, Display, Write};
+use crate::{backend::Coord, backend::Stone};
 
-// TODO a coord mod
-// TODO translate 1-1 coord and A1 coord
-pub struct Coord {
-    y: usize,
-    x: usize,
-}
-
-impl Display for Coord {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "[{}, {}]", self.x, self.y)
-    }
-}
-
-pub struct PlaceStoneAction {
+pub struct PlaceStoneResult {
     pub place: Coord,      // 落子坐标
     pub eaten: Vec<Coord>, // 吃子坐标
 }
 
-#[derive(Clone, Copy)]
-pub enum Stone {
-    Black,
-    White,
-}
-impl Stone {
-    #[inline]
-    pub fn as_char(&self) -> char {
-        match self {
-            Stone::Black => '●',
-            Stone::White => '○',
-        }
-    }
-
-    #[inline]
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Stone::Black => "●",
-            Stone::White => "○",
-        }
-    }
-}
-impl Display for Stone {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_char(self.as_char())
-    }
-}
-impl Debug for Stone {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // Debug is the same as Display
-        Display::fmt(self, f)
-    }
-}
+pub type EngineResult = Result<PlaceStoneResult, &'static str>;
 
 /// 以左上角为原点，向下为+y，向右为+x
 type Board = Vec<Option<Stone>>;
@@ -59,6 +14,7 @@ pub struct Engine {
     size: usize,
     board: Board,
 }
+
 impl Engine {
     pub fn new(size: usize) -> Self {
         Engine {
@@ -73,12 +29,7 @@ impl Engine {
         return y * self.size + x;
     }
 
-    pub fn place_stone(
-        &mut self,
-        y: usize,
-        x: usize,
-        stone: Stone,
-    ) -> Result<PlaceStoneAction, &'static str> {
+    pub fn place_stone(&mut self, y: usize, x: usize, stone: Stone) -> EngineResult {
         let idx = self.xy_to_idx(y, x);
         debug_assert!(idx < self.board.len());
 
@@ -91,8 +42,8 @@ impl Engine {
         // TODO 禁止全局同形
 
         self.board[idx] = Some(stone);
-        Ok(PlaceStoneAction {
-            place: Coord { y, x },
+        Ok(PlaceStoneResult {
+            place: Coord::new(y, x),
             eaten: vec![], // TODO eaten
         })
     }
