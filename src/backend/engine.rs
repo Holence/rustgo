@@ -6,11 +6,39 @@ pub struct PlaceStoneResult {
 
 pub type EngineResult = Result<PlaceStoneResult, &'static str>;
 
-pub type Board = Box<[Stone]>; // 以左上角为原点，向下为+y，向右为+x
+pub type Board = Box<[Stone]>;
+
+#[derive(Clone)]
+struct GroupInfo {
+    qi: usize,    // group的气
+    color: Stone, // group的颜色
+}
 
 pub struct Engine {
     size: usize,
+
+    /// 棋盘所有坐标位置的一维存储 ( 2D_board[y][x] == board[y*size+x] ), 以左上角为原点, 向下为+y, 向右为+x
+    ///
+    /// board.len() == size * size
     board: Board,
+
+    /// 同色、连续的棋子在运行时用 disjoint set 来分组记录
+    ///
+    /// group_idx.len() == size * size
+    ///
+    /// 1. 初始时 group_idx[idx] == idx, 表示 board[idx] 所对应的位置不存在棋子
+    /// 2. 在 board[idx] 处放置了棋子后, group_idx[idx] == -1, 表示 board[idx] 所对应的位置成为了棋子组
+    /// 3. 在 board[idx+1] 处放置了棋子后, group_idx[idx+1] == idx, group_idx[idx] == -2, 表示 board[idx+1] 的棋子归属于 board[idx] 统帅, board[idx] 统帅着 2 个棋子
+    /// 4. 若 group_idx[idx] == -num, 则表示为 board[idx] 所对应的位置是某个棋子组的首领, 它统帅着 num 个棋子
+    group_idx: Box<[isize]>,
+
+    /// 棋子组的额外信息
+    ///
+    /// group_info.len() == size * size
+    ///
+    /// 1. 只在 group_idx[idx] == -num 时, 才有 group_info[idx] == Some(Box<GroupInfo>)
+    /// 2. 其他情况, group_info[idx] == None
+    group_info: Box<[Option<Box<GroupInfo>>]>,
 }
 
 impl Engine {
@@ -18,12 +46,23 @@ impl Engine {
         Engine {
             size: size,
             board: vec![Stone::Void; size * size].into_boxed_slice(),
+            group_idx: (0..(size * size) as isize)
+                .collect::<Vec<isize>>()
+                .into_boxed_slice(),
+            group_info: vec![None; size * size].into_boxed_slice(),
         }
     }
 
     pub fn with_board(size: usize, board: Board) -> Self {
         debug_assert!(size * size == board.len());
-        Engine { size, board }
+        Engine {
+            size,
+            board,
+            group_idx: (0..(size * size) as isize)
+                .collect::<Vec<isize>>()
+                .into_boxed_slice(),
+            group_info: vec![None; size * size].into_boxed_slice(),
+        }
     }
 
     fn idx(&self, coord: Coord) -> usize {
@@ -76,7 +115,7 @@ impl Engine {
             // 检测周围group的气是否被当前落子更新为0, 更新为0的group即为被吃的子
         }
 
-        // 如果没有吃子发生，且本坐标的气为0，则为自杀行为
+        // 如果没有吃子发生, 且本坐标的气为0, 则为自杀行为
         if coord_qi == 0 && eaten.len() == 0 {
             return Err("禁止使己方气尽");
         }

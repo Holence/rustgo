@@ -2,27 +2,27 @@ use std::fmt::{Debug, Display, Write};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Stone {
+    Void,
     Black,
     White,
-    Void,
 }
 
 impl Stone {
     #[inline]
     pub fn as_char(&self) -> char {
         match self {
+            Stone::Void => '_',
             Stone::Black => '●',
             Stone::White => '○',
-            Stone::Void => '_',
         }
     }
 
     #[inline]
     pub fn as_str(&self) -> &'static str {
         match self {
+            Stone::Void => "_",
             Stone::Black => "●",
             Stone::White => "○",
-            Stone::Void => "_",
         }
     }
 }
