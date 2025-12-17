@@ -1,9 +1,10 @@
 use std::fmt::{Debug, Display, Write};
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Stone {
     Black,
     White,
+    Void,
 }
 
 impl Stone {
@@ -12,6 +13,7 @@ impl Stone {
         match self {
             Stone::Black => '●',
             Stone::White => '○',
+            Stone::Void => '_',
         }
     }
 
@@ -20,6 +22,7 @@ impl Stone {
         match self {
             Stone::Black => "●",
             Stone::White => "○",
+            Stone::Void => "_",
         }
     }
 }

@@ -6,7 +6,10 @@ use cursive::{
     views::TextView,
 };
 
-use crate::{backend::Coord, model::Game};
+use crate::{
+    backend::{Coord, Stone},
+    model::Game,
+};
 
 pub struct BoardView {
     game: Game,
@@ -80,14 +83,14 @@ impl View for BoardView {
             for x in 0..size {
                 let idx = y * size + x;
                 let text = match board[idx] {
-                    Some(stone) => stone.as_str(),
-                    None => {
+                    Stone::Void => {
                         if size == 19 && STAR.contains(&(x, y)) {
                             "+"
                         } else {
                             "·"
                         }
                     }
+                    stone => stone.as_str(),
                 };
                 printer.print(
                     (

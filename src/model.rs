@@ -5,6 +5,7 @@ impl Stone {
         match self {
             Stone::Black => Stone::White,
             Stone::White => Stone::Black,
+            Stone::Void => panic!(),
         }
     }
 }
@@ -26,7 +27,7 @@ impl Game {
         self.engine.size()
     }
 
-    pub fn board(&self) -> &[Option<Stone>] {
+    pub fn board(&self) -> &[Stone] {
         self.engine.board()
     }
 

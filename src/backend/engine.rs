@@ -6,17 +6,24 @@ pub struct PlaceStoneResult {
 
 pub type EngineResult = Result<PlaceStoneResult, &'static str>;
 
+pub type Board = Box<[Stone]>; // 以左上角为原点，向下为+y，向右为+x
+
 pub struct Engine {
     size: usize,
-    board: Box<[Option<Stone>]>, // 以左上角为原点，向下为+y，向右为+x
+    board: Board,
 }
 
 impl Engine {
     pub fn new(size: usize) -> Self {
         Engine {
             size: size,
-            board: vec![None; size * size].into_boxed_slice(),
+            board: vec![Stone::Void; size * size].into_boxed_slice(),
         }
+    }
+
+    pub fn with_board(size: usize, board: Board) -> Self {
+        debug_assert!(size * size == board.len());
+        Engine { size, board }
     }
 
     fn idx(&self, coord: Coord) -> usize {
@@ -43,10 +50,12 @@ impl Engine {
     }
 
     fn have_stone(&self, coord: Coord) -> bool {
-        self.board[self.idx(coord)].is_some()
+        self.board[self.idx(coord)] != Stone::Void
     }
 
     pub fn place_stone(&mut self, coord: Coord, stone: Stone) -> EngineResult {
+        debug_assert!(stone != Stone::Void);
+
         let idx = self.idx(coord);
         debug_assert!(idx < self.board.len());
 
@@ -72,7 +81,7 @@ impl Engine {
             return Err("禁止使己方气尽");
         }
 
-        self.board[idx] = Some(stone);
+        self.board[idx] = stone;
         Ok(PlaceStoneResult { eaten: eaten })
     }
 
@@ -80,7 +89,7 @@ impl Engine {
         self.size
     }
 
-    pub fn board(&self) -> &[Option<Stone>] {
+    pub fn board(&self) -> &[Stone] {
         &self.board
     }
 
@@ -89,12 +98,8 @@ impl Engine {
         let mut idx = 0;
         for _ in 0..self.size {
             for _ in 0..self.size {
-                let ch = match self.board[idx] {
-                    Some(stone) => stone.as_char(),
-                    None => '_',
-                };
+                let ch = self.board[idx].as_char();
                 s.push(ch);
-                s.push(' ');
                 idx += 1;
             }
             s.push('\n');
