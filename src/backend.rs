@@ -1,5 +1,6 @@
 mod common;
 mod coord;
+mod disjoint_set;
 mod engine;
 mod stone;
 

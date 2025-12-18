@@ -1,4 +1,4 @@
-use crate::backend::{Array, Coord, Stone};
+use crate::backend::{Array, Coord, Stone, disjoint_set::DisjointSet};
 
 pub struct PlaceStoneResult {
     pub eaten: Vec<Coord>, // 吃子坐标
@@ -30,7 +30,7 @@ pub struct Engine {
     /// 2. 在 board[idx] 处放置了棋子后, group_idx[idx] == -1, 表示 board[idx] 所对应的位置成为了棋子组
     /// 3. 在 board[idx+1] 处放置了棋子后, group_idx[idx+1] == idx, group_idx[idx] == -2, 表示 board[idx+1] 的棋子归属于 board[idx] 统帅, board[idx] 统帅着 2 个棋子
     /// 4. 若 group_idx[idx] == -num, 则表示为 board[idx] 所对应的位置是某个棋子组的首领, 它统帅着 num 个棋子
-    group_idx: Array<isize>,
+    stone_disjoint_set: DisjointSet,
 
     /// 棋子组的额外信息
     ///
@@ -46,9 +46,7 @@ impl Engine {
         Engine {
             size: size,
             board: vec![Stone::Void; size * size].into_boxed_slice(),
-            group_idx: (0..(size * size) as isize)
-                .collect::<Vec<isize>>()
-                .into_boxed_slice(),
+            stone_disjoint_set: DisjointSet::new(size * size),
             group_info: vec![None; size * size].into_boxed_slice(),
         }
     }
@@ -58,9 +56,7 @@ impl Engine {
         Engine {
             size,
             board,
-            group_idx: (0..(size * size) as isize)
-                .collect::<Vec<isize>>()
-                .into_boxed_slice(),
+            stone_disjoint_set: DisjointSet::new(size * size),
             group_info: vec![None; size * size].into_boxed_slice(),
         }
     }
