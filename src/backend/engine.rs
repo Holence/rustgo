@@ -72,7 +72,7 @@ impl Engine {
     }
 
     fn neighbors(&self, idx: Idx) -> Vec<Idx> {
-        let mut v: Vec<Idx> = Vec::new();
+        let mut v: Vec<Idx> = Vec::new(); // TODO array vec on stack
         let y = idx / self.size;
         let x = idx % self.size;
         if x > 0 {
@@ -90,14 +90,46 @@ impl Engine {
         return v;
     }
 
+    fn neighbor_groups(&mut self, idx: Idx) -> Vec<Idx> {
+        let mut v: Vec<Idx> = Vec::new(); // TODO array vec on stack
+        let y = idx / self.size;
+        let x = idx % self.size;
+        let mut neigbor_idx: Idx;
+        if x > 0 {
+            neigbor_idx = (x - 1) + self.size * (y);
+            if self.have_stone(neigbor_idx) {
+                push_if_not_exist(&mut v, self.group_ds.find_root(neigbor_idx));
+            }
+        }
+        if x < self.size - 1 {
+            neigbor_idx = (x + 1) + self.size * (y);
+            if self.have_stone(neigbor_idx) {
+                push_if_not_exist(&mut v, self.group_ds.find_root(neigbor_idx));
+            }
+        }
+        if y > 0 {
+            neigbor_idx = (x) + self.size * (y - 1);
+            if self.have_stone(neigbor_idx) {
+                push_if_not_exist(&mut v, self.group_ds.find_root(neigbor_idx));
+            }
+        }
+        if y < self.size - 1 {
+            neigbor_idx = (x) + self.size * (y + 1);
+            if self.have_stone(neigbor_idx) {
+                push_if_not_exist(&mut v, self.group_ds.find_root(neigbor_idx));
+            }
+        }
+        return v;
+    }
+
     fn have_stone(&self, idx: Idx) -> bool {
         self.board[idx] != Stone::Void
     }
 
     fn calc_qi(&self, members: &Vec<Idx>) -> usize {
         let mut voids: HashSet<Idx> = HashSet::new();
-        for member in members {
-            for neighbor in self.neighbors(*member) {
+        for &member in members {
+            for neighbor in self.neighbors(member) {
                 if !self.have_stone(neighbor) {
                     voids.insert(neighbor);
                 }
@@ -106,8 +138,33 @@ impl Engine {
         return voids.len();
     }
 
+    #[cfg(debug_assertions)]
+    fn verbose_check(&self) {
+        for idx in 0..self.size {
+            if self.have_stone(idx) {
+                // check group member
+                let mut tmp = self.group_ds.clone();
+                let root = tmp.find_root(idx);
+                let b: HashSet<usize> = self.group_info[root]
+                    .as_ref()
+                    .unwrap()
+                    .members
+                    .iter()
+                    .cloned()
+                    .collect();
+                let a: HashSet<usize> = tmp.group_members(idx).iter().cloned().collect();
+                debug_assert!(HashSet::difference(&a, &b).count() == 0);
+
+                // TODO check 气
+            }
+        }
+    }
+
     pub fn place_stone(&mut self, coord: Coord, stone: Stone) -> EngineResult {
         debug_assert!(stone != Stone::Void);
+
+        #[cfg(debug_assertions)]
+        self.verbose_check();
 
         let cur_idx = self.idx(coord);
         debug_assert!(cur_idx < self.board.len());
@@ -124,12 +181,12 @@ impl Engine {
         let mut self_groups: Vec<Idx> = Vec::with_capacity(4); // TODO array vec on stack
         let mut eaten_groups: Vec<Idx> = Vec::with_capacity(4);
         let mut other_groups: Vec<Idx> = Vec::with_capacity(4);
-        for neighbor in self.neighbors(cur_idx) {
-            let neighbor_stone = self.board[neighbor];
+        for neighbor_idx in self.neighbors(cur_idx) {
+            let neighbor_stone = self.board[neighbor_idx];
             if neighbor_stone == Stone::Void {
                 cur_qi += 1;
             } else {
-                let root_idx = self.group_ds.find_root(neighbor);
+                let root_idx = self.group_ds.find_root(neighbor_idx);
                 let group_info = self.group_info[root_idx].as_ref().unwrap();
                 debug_assert!(group_info.members.len() > 0);
                 debug_assert!(group_info.qi > 0);
@@ -206,8 +263,28 @@ impl Engine {
 
         // 6.3 如果有"提子组", 则把所有"提子组"的members统计为一个list, 棋盘上这些坐标置空, 遍历list, 对于每个member遗址, 更新遗址周围的组的"气"
         //     (这里之所以要先把所有"提子组"merge为list再遍历, 而不是对每个"提子组"依次遍历, 是因为考虑到N色棋的提子情况, 一次落子可能提走几种颜色的"非己方组")
+        // TODO more test
+        let mut eaten: Vec<Idx> = vec![];
+        for root_idx in eaten_groups {
+            let group = self.group_info[root_idx].take().unwrap(); // take out, and free
+            eaten.extend(group.members);
+            self.group_ds.delete_group(root_idx);
+        }
+        for &idx in &eaten {
+            self.board[idx] = Stone::Void;
+        }
+        for &idx in &eaten {
+            for root_idx in self.neighbor_groups(idx) {
+                self.group_info[root_idx].as_mut().unwrap().qi += 1;
+            }
+        }
 
-        Ok(PlaceStoneResult { eaten: vec![] })
+        Ok(PlaceStoneResult {
+            eaten: eaten
+                .iter()
+                .map(|idx| Coord::new(idx % self.size, idx / self.size))
+                .collect(),
+        })
     }
 
     pub fn size(&self) -> usize {

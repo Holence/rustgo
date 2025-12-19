@@ -16,10 +16,6 @@ impl DisjointSet {
         }
     }
 
-    pub fn group_size(&mut self, idx: usize) -> usize {
-        return (-self.group_idx[self.find_root(idx)]) as usize;
-    }
-
     pub fn find_root(&mut self, idx: usize) -> usize {
         let parent_idx = self.group_idx[idx];
         if parent_idx < 0 {
@@ -31,7 +27,33 @@ impl DisjointSet {
         }
     }
 
-    pub fn is_connect(&mut self, idx_a: usize, idx_b: usize) -> bool {
+    pub fn group_size(&mut self, idx: usize) -> usize {
+        let root = self.find_root(idx);
+        return (-self.group_idx[root]) as usize;
+    }
+
+    /// 最好的情况时间复杂度 O(N)
+    pub fn group_members(&mut self, idx: usize) -> Vec<usize> {
+        let root = self.find_root(idx);
+        let mut members: Vec<usize> = vec![];
+        for idx in 0..self.group_idx.len() {
+            if self.find_root(idx) == root {
+                members.push(idx);
+            }
+        }
+        debug_assert!(members.len() == self.group_size(root));
+        return members;
+    }
+
+    pub fn delete_group(&mut self, idx: usize) {
+        let members = self.group_members(idx);
+        for idx in members {
+            // 恢复初始值
+            self.group_idx[idx] = -1;
+        }
+    }
+
+    pub fn is_connected(&mut self, idx_a: usize, idx_b: usize) -> bool {
         self.find_root(idx_a) == self.find_root(idx_b)
     }
 
@@ -46,14 +68,19 @@ impl DisjointSet {
     }
 }
 
+impl Clone for DisjointSet {
+    fn clone(&self) -> Self {
+        Self {
+            group_idx: self.group_idx.clone(),
+        }
+    }
+}
 impl Debug for DisjointSet {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "{:?}", self.group_idx)?;
 
         // Work on a temporary copy to avoid mutating self
-        let mut tmp = DisjointSet {
-            group_idx: self.group_idx.clone(),
-        };
+        let mut tmp = self.clone();
 
         // root_idx -> member_idxs
         let mut groups: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
@@ -78,12 +105,18 @@ mod test {
     #[test]
     fn test() {
         let mut d = DisjointSet::new(10);
-        assert!(d.is_connect(1, 9) == false);
+        assert!(d.is_connected(1, 9) == false);
         d.connect(1, 9);
-        assert!(d.is_connect(1, 9) == true);
+        assert!(d.is_connected(1, 9) == true);
         assert!(d.group_size(1) == 2);
         assert!(d.group_size(9) == 2);
         assert!(d.group_size(0) == 1);
+        dbg!(&d);
+        assert!(d.group_members(1) == vec![1, 9]);
+        d.delete_group(1);
+        assert!(d.group_members(1) == vec![1]);
+        assert!(d.group_size(1) == 1);
+        assert!(d.group_size(9) == 1);
         dbg!(&d);
     }
 }
