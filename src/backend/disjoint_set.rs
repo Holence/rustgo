@@ -20,7 +20,7 @@ impl DisjointSet {
         return (-self.group_idx[self.find_root(idx)]) as usize;
     }
 
-    fn find_root(&mut self, idx: usize) -> usize {
+    pub fn find_root(&mut self, idx: usize) -> usize {
         let parent_idx = self.group_idx[idx];
         if parent_idx < 0 {
             return idx;

@@ -28,7 +28,7 @@ fn test_2() {
         Black, Void, Black,
         Void, Black, Void,
     ]);
-    let mut engine = Engine::with_board(3, board);
+    let mut engine = Engine::new_with_board(3, board);
     let result = engine.place_stone(Coord::new(1, 1), Black);
     assert!(result.is_ok());
 }
@@ -41,7 +41,7 @@ fn test_3() {
         Black, Void, Black,
         Void, Black, Void,
     ]);
-    let mut engine = Engine::with_board(3, board);
+    let mut engine = Engine::new_with_board(3, board);
     let result = engine.place_stone(Coord::new(1, 1), White);
     assert!(result.is_err());
 }
