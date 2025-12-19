@@ -164,17 +164,18 @@ impl Engine {
         }
 
         // 5. 禁止全局同形: "棋盘经过落子+提子的变化" 与 list[历史记录] 比较, 不可以相同
+        // TODO
 
         // 6. 之后便允许落子
         self.board[cur_idx] = stone;
 
         // 6.1 如果有"己方组", 则将落子与"己方组"merge, group root可能会更新, 在group root中更新"气"和members
         //     (此时气可能为0, 要等到提子后才还会被接着更新)
-        // TODO 很难写出通过简单加加减减merge group的气，因为还需要考虑公气
         if self_groups.len() == 0 {
             // 自己成组
             self.group_info[cur_idx] = Some(Box::new(GroupInfo::new(stone, cur_qi, vec![cur_idx])));
         } else {
+            // TODO 很难归纳出通过简单加加减减merge group气的算法，因为还需要考虑公气
             // 这里直接粗暴merge, 再重新计算整个group的气
             let mut members: Vec<Idx> = vec![cur_idx];
             for root_idx in self_groups {
@@ -199,6 +200,9 @@ impl Engine {
         }
 
         // 6.2 如果有"非己方组"且不是"提子组", 则用落子更新"气"
+        for root_idx in other_groups {
+            self.group_info[root_idx].as_mut().unwrap().qi -= 1;
+        }
 
         // 6.3 如果有"提子组", 则把所有"提子组"的members统计为一个list, 棋盘上这些坐标置空, 遍历list, 对于每个member遗址, 更新遗址周围的组的"气"
         //     (这里之所以要先把所有"提子组"merge为list再遍历, 而不是对每个"提子组"依次遍历, 是因为考虑到N色棋的提子情况, 一次落子可能提走几种颜色的"非己方组")
