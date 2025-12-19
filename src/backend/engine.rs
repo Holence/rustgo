@@ -99,25 +99,33 @@ impl Engine {
             return Err("禁止下到已有的棋子上");
         }
 
-        // 2. 禁止全局同形 TODO
-
-        // 3. 计算吃子 TODO
-        let mut coord_qi: usize = 0;
-        let mut eaten: Vec<Coord> = vec![];
+        // 2. 计算落子位置的"气"为 `cur_qi`
+        let mut cur_qi: usize = 0;
         for neighbor_coord in self.neighbor_coords(coord) {
             if !self.have_stone(neighbor_coord) {
-                coord_qi += 1;
+                cur_qi += 1;
             }
-            // 检测周围group的气是否被当前落子更新为0, 更新为0的group即为被吃的子
         }
 
-        // 如果没有吃子发生, 且本坐标的气为0, 则为自杀行为
-        if coord_qi == 0 && eaten.len() == 0 {
-            return Err("禁止使己方气尽");
-        }
+        // 3. 找出落子周围的"非己方组"与"己方组"
+        //    其中"提子组"定义为: "非己方组" 且 "气"为1
+
+        // 4. 禁止自杀: 如果没有"提子组", 且`cur_qi==0`且所有"己方组"的"气"都是1, 则判定为自杀
+
+        // 5. 禁止全局同形: "棋盘经过落子+提子的变化" 与 list[历史记录] 比较, 不可以相同
+
+        // 6. 之后便允许落子
+
+        // 6.1 如果有"己方组", 则将落子与"己方组"merge, group root可能会更新, 在group root中更新"气"和members
+        //     (此时气可能为0, 要等到提子后才还会被接着更新)
+
+        // 6.2 如果有"非己方组"且不是"提子组", 则用落子更新"气"
+
+        // 6.3 如果有"提子组", 则把所有"提子组"的members统计为一个list, 棋盘上这些坐标置空, 遍历list, 对于每个member遗址, 更新遗址周围的组的"气"
+        //     (这里之所以要先把所有"提子组"merge为list再遍历, 而不是对每个"提子组"依次遍历, 是因为考虑到N色棋的提子情况, 一次落子可能提走几种颜色的"非己方组")
 
         self.board[idx] = stone;
-        Ok(PlaceStoneResult { eaten: eaten })
+        Ok(PlaceStoneResult { eaten: vec![] })
     }
 
     pub fn size(&self) -> usize {
