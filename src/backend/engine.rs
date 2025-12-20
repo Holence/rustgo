@@ -72,7 +72,7 @@ impl Engine {
     }
 
     fn neighbors(&self, idx: Idx) -> Vec<Idx> {
-        let mut v: Vec<Idx> = Vec::new(); // TODO array vec on stack
+        let mut v: Vec<Idx> = Vec::with_capacity(4); // TODO array vec on stack
         let y = idx / self.size;
         let x = idx % self.size;
         if x > 0 {
