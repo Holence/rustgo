@@ -1,4 +1,7 @@
-use std::{collections::HashSet, mem::replace};
+use std::{
+    collections::{HashSet, VecDeque},
+    mem::replace,
+};
 
 use crate::backend::{Array, Coord, Stone, disjoint_set::DisjointSet};
 
@@ -25,6 +28,8 @@ impl GroupInfo {
     }
 }
 
+const MAX_STATES_RECORD: usize = 30;
+
 pub struct Engine {
     size: usize,
 
@@ -43,6 +48,9 @@ pub struct Engine {
     /// 1. 只在 idx == group root 时, 才有 group_info[idx] == Some(Box<GroupInfo>)
     /// 2. 其他情况, group_info[idx] == None
     group_info: Array<Option<Box<GroupInfo>>>,
+
+    /// 为了判断全局同形的状态记录
+    states: VecDeque<Board>, // TODO fixed size deque
 }
 
 impl Engine {
@@ -52,6 +60,7 @@ impl Engine {
             board: vec![Stone::Void; size * size].into_boxed_slice(),
             group_ds: DisjointSet::new(size * size),
             group_info: vec![None; size * size].into_boxed_slice(),
+            states: VecDeque::with_capacity(MAX_STATES_RECORD),
         }
     }
 
@@ -62,6 +71,7 @@ impl Engine {
             board,
             group_ds: DisjointSet::new(size * size),
             group_info: vec![None; size * size].into_boxed_slice(),
+            states: VecDeque::with_capacity(MAX_STATES_RECORD),
         }
     }
 
@@ -221,7 +231,18 @@ impl Engine {
         }
 
         // 5. 禁止全局同形: "棋盘经过落子+提子的变化" 与 list[历史记录] 比较, 不可以相同
-        // TODO
+        let mut new_board = self.board.clone();
+        new_board[cur_idx] = stone;
+        for &root_idx in &eaten_groups {
+            for &member in &(self.group_info[root_idx].as_ref().unwrap().members) {
+                new_board[member] = Stone::Void;
+            }
+        }
+        for board in &self.states {
+            if *board == new_board {
+                return Err("禁止全局同形");
+            }
+        }
 
         // 6. 之后便允许落子
         self.board[cur_idx] = stone;
@@ -277,6 +298,11 @@ impl Engine {
             for root_idx in self.neighbor_groups(idx) {
                 self.group_info[root_idx].as_mut().unwrap().qi += 1;
             }
+        }
+
+        self.states.push_front(self.board.clone());
+        if self.states.len() == MAX_STATES_RECORD {
+            self.states.pop_back();
         }
 
         Ok(PlaceStoneResult {
