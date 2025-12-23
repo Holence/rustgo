@@ -9,7 +9,7 @@ pub struct PlaceStoneResult {
     pub eaten: Vec<Coord>, // 吃子坐标
 }
 
-pub type EngineResult = Result<PlaceStoneResult, &'static str>;
+pub type EngineResult = Result<PlaceStoneResult, &'static str>; // TODO err type
 
 pub type Board = Array<Stone>;
 type Idx = usize;
@@ -17,14 +17,13 @@ type Idx = usize;
 // TODO more assert on this info
 #[derive(Clone, Debug)]
 struct GroupInfo {
-    stone: Stone,      // group的棋子颜色 TODO 是否无用?
     qi: usize,         // group的气
     members: Vec<Idx>, // group的所有棋子
 }
 
 impl GroupInfo {
-    fn new(stone: Stone, qi: usize, members: Vec<Idx>) -> Self {
-        Self { stone, qi, members }
+    fn new(qi: usize, members: Vec<Idx>) -> Self {
+        Self { qi, members }
     }
 }
 
@@ -137,7 +136,7 @@ impl Engine {
     }
 
     fn calc_qi(&self, members: &Vec<Idx>) -> usize {
-        let mut voids: HashSet<Idx> = HashSet::new();
+        let mut voids: HashSet<Idx> = HashSet::with_capacity(members.len());
         for &member in members {
             for neighbor in self.neighbors(member) {
                 if !self.have_stone(neighbor) {
@@ -201,10 +200,8 @@ impl Engine {
                 debug_assert!(group_info.members.len() > 0);
                 debug_assert!(group_info.qi > 0);
                 if neighbor_stone == stone {
-                    debug_assert!(group_info.stone == stone);
                     push_if_not_exist(&mut self_groups, root_idx);
                 } else {
-                    debug_assert!(group_info.stone != stone);
                     if group_info.qi == 1 {
                         push_if_not_exist(&mut eaten_groups, root_idx);
                     } else {
@@ -231,6 +228,7 @@ impl Engine {
         }
 
         // 5. 禁止全局同形: "棋盘经过落子+提子的变化" 与 list[历史记录] 比较, 不可以相同
+        // TODO 存储压缩
         let mut new_board = self.board.clone();
         new_board[cur_idx] = stone;
         for &root_idx in &eaten_groups {
@@ -251,7 +249,7 @@ impl Engine {
         //     (此时气可能为0, 要等到提子后才还会被接着更新)
         if self_groups.len() == 0 {
             // 自己成组
-            self.group_info[cur_idx] = Some(Box::new(GroupInfo::new(stone, cur_qi, vec![cur_idx])));
+            self.group_info[cur_idx] = Some(Box::new(GroupInfo::new(cur_qi, vec![cur_idx])));
         } else {
             // TODO 很难归纳出通过简单加加减减merge group气的算法，因为还需要考虑公气
             // 这里直接粗暴merge, 再重新计算整个group的气
@@ -272,7 +270,7 @@ impl Engine {
                     let _ = replace(&mut group.members, members);
                 }
                 None => {
-                    self.group_info[root_idx] = Some(Box::new(GroupInfo::new(stone, qi, members)));
+                    self.group_info[root_idx] = Some(Box::new(GroupInfo::new(qi, members)));
                 }
             }
         }
