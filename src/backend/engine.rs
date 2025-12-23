@@ -3,7 +3,14 @@ use std::{
     mem::replace,
 };
 
-use crate::backend::{Array, Coord, Stone, disjoint_set::DisjointSet};
+use crate::backend::{
+    Array, Coord, Idx, Stone,
+    disjoint_set::DisjointSet,
+    engine::group_info::{GroupInfo, GroupInfoArray},
+};
+
+mod group_info;
+const MAX_STATES_RECORD: usize = 30;
 
 pub struct PlaceStoneResult {
     pub eaten: Vec<Coord>, // 吃子坐标
@@ -12,22 +19,6 @@ pub struct PlaceStoneResult {
 pub type EngineResult = Result<PlaceStoneResult, &'static str>; // TODO err type
 
 pub type Board = Array<Stone>;
-type Idx = usize;
-
-// TODO more assert on this info
-#[derive(Clone, Debug)]
-struct GroupInfo {
-    qi: usize,         // group的气
-    members: Vec<Idx>, // group的所有棋子
-}
-
-impl GroupInfo {
-    fn new(qi: usize, members: Vec<Idx>) -> Self {
-        Self { qi, members }
-    }
-}
-
-const MAX_STATES_RECORD: usize = 30;
 
 pub struct Engine {
     size: usize,
@@ -46,7 +37,7 @@ pub struct Engine {
     ///
     /// 1. 只在 idx == group root 时, 才有 group_info[idx] == Some(Box<GroupInfo>)
     /// 2. 其他情况, group_info[idx] == None
-    group_info: Array<Option<Box<GroupInfo>>>,
+    group_info: GroupInfoArray,
 
     /// 为了判断全局同形的状态记录
     states: VecDeque<Board>, // TODO fixed size deque
@@ -58,7 +49,7 @@ impl Engine {
             size: size,
             board: vec![Stone::Void; size * size].into_boxed_slice(),
             group_ds: DisjointSet::new(size * size),
-            group_info: vec![None; size * size].into_boxed_slice(),
+            group_info: GroupInfoArray::new(size * size),
             states: VecDeque::with_capacity(MAX_STATES_RECORD),
         }
     }
@@ -69,7 +60,7 @@ impl Engine {
             size,
             board,
             group_ds: DisjointSet::new(size * size),
-            group_info: vec![None; size * size].into_boxed_slice(),
+            group_info: GroupInfoArray::new(size * size),
             states: VecDeque::with_capacity(MAX_STATES_RECORD),
         }
     }
@@ -154,13 +145,7 @@ impl Engine {
                 // check group member
                 let mut tmp = self.group_ds.clone();
                 let root = tmp.find_root(idx);
-                let b: HashSet<usize> = self.group_info[root]
-                    .as_ref()
-                    .unwrap()
-                    .members
-                    .iter()
-                    .cloned()
-                    .collect();
+                let b: HashSet<usize> = self.group_info.get(root).members.iter().cloned().collect();
                 let a: HashSet<usize> = tmp.group_members(idx).iter().cloned().collect();
                 debug_assert!(HashSet::difference(&a, &b).count() == 0);
 
@@ -196,7 +181,7 @@ impl Engine {
                 cur_qi += 1;
             } else {
                 let root_idx = self.group_ds.find_root(neighbor_idx);
-                let group_info = self.group_info[root_idx].as_ref().unwrap();
+                let group_info = self.group_info.get(root_idx);
                 debug_assert!(group_info.members.len() > 0);
                 debug_assert!(group_info.qi > 0);
                 if neighbor_stone == stone {
@@ -216,7 +201,7 @@ impl Engine {
             if cur_qi == 0 {
                 let mut flag = false;
                 for &root_idx in &self_groups {
-                    if self.group_info[root_idx].as_ref().unwrap().qi != 1 {
+                    if self.group_info.get(root_idx).qi != 1 {
                         flag = true;
                         break;
                     }
@@ -232,7 +217,7 @@ impl Engine {
         let mut new_board = self.board.clone();
         new_board[cur_idx] = stone;
         for &root_idx in &eaten_groups {
-            for &member in &(self.group_info[root_idx].as_ref().unwrap().members) {
+            for &member in &(self.group_info.get(root_idx).members) {
                 new_board[member] = Stone::Void;
             }
         }
@@ -263,8 +248,8 @@ impl Engine {
             let root_idx = self.group_ds.find_root(cur_idx);
 
             let qi = self.calc_qi(&members);
-            let option = self.group_info[root_idx].as_mut();
-            match option {
+            let group_info = &mut self.group_info[root_idx];
+            match group_info {
                 Some(group) => {
                     group.qi = qi;
                     let _ = replace(&mut group.members, members);
@@ -277,7 +262,7 @@ impl Engine {
 
         // 6.2 如果有"非己方组"且不是"提子组", 则用落子更新"气"
         for root_idx in other_groups {
-            self.group_info[root_idx].as_mut().unwrap().qi -= 1;
+            self.group_info.get_mut(root_idx).qi -= 1;
         }
 
         // 6.3 如果有"提子组", 则把所有"提子组"的members统计为一个list, 棋盘上这些坐标置空, 遍历list, 对于每个member遗址, 更新遗址周围的组的"气"
@@ -294,7 +279,7 @@ impl Engine {
         }
         for &idx in &eaten {
             for root_idx in self.neighbor_groups(idx) {
-                self.group_info[root_idx].as_mut().unwrap().qi += 1;
+                self.group_info.get_mut(root_idx).qi += 1;
             }
         }
 
