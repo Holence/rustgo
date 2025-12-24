@@ -15,7 +15,8 @@ impl GroupInfo {
     }
 }
 
-pub struct GroupInfoArray(Array<Option<Box<GroupInfo>>>);
+pub struct GroupInfoArray(Array<Option<GroupInfo>>);
+
 impl GroupInfoArray {
     pub fn new(size: usize) -> Self {
         GroupInfoArray(vec![None; size].into_boxed_slice())
@@ -31,7 +32,7 @@ impl GroupInfoArray {
 }
 
 impl Index<usize> for GroupInfoArray {
-    type Output = Option<Box<GroupInfo>>;
+    type Output = Option<GroupInfo>;
 
     fn index(&self, index: usize) -> &Self::Output {
         &self.0[index]

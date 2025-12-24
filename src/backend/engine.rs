@@ -234,7 +234,7 @@ impl Engine {
         //     (此时气可能为0, 要等到提子后才还会被接着更新)
         if self_groups.len() == 0 {
             // 自己成组
-            self.group_info[cur_idx] = Some(Box::new(GroupInfo::new(cur_qi, vec![cur_idx])));
+            self.group_info[cur_idx] = Some(GroupInfo::new(cur_qi, vec![cur_idx]));
         } else {
             // TODO 很难归纳出通过简单加加减减merge group气的算法，因为还需要考虑公气
             // 这里直接粗暴merge, 再重新计算整个group的气
@@ -255,7 +255,7 @@ impl Engine {
                     let _ = replace(&mut group.members, members);
                 }
                 None => {
-                    self.group_info[root_idx] = Some(Box::new(GroupInfo::new(qi, members)));
+                    self.group_info[root_idx] = Some(GroupInfo::new(qi, members));
                 }
             }
         }
