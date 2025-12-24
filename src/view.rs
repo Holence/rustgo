@@ -64,7 +64,7 @@ impl BoardView {
         match result {
             Ok(action) => {
                 // TODO
-                action.eaten;
+                action.eaten_stones;
                 EventResult::with_cb_once(move |s| append_log(s, coord.to_string()))
             }
             Err(msg) => EventResult::with_cb(move |s| {

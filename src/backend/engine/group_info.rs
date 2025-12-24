@@ -22,10 +22,20 @@ impl GroupInfoArray {
         GroupInfoArray(vec![None; size].into_boxed_slice())
     }
 
+    /// 返回下标为index的组的 &GroupInfo
+    ///
+    /// # Panics
+    ///
+    /// 如果 index 不是 group root (`self.0[index] == None`)
     pub fn get(&self, index: usize) -> &GroupInfo {
         self.0[index].as_ref().unwrap()
     }
 
+    /// 返回下标为index的组的 &mut GroupInfo
+    ///
+    /// # Panics
+    ///
+    /// 如果 index 不是 group root (`self.0[index] == None`)
     pub fn get_mut(&mut self, index: usize) -> &mut GroupInfo {
         self.0[index].as_mut().unwrap()
     }
