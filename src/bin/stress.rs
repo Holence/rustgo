@@ -1,4 +1,3 @@
-use cursive::reexports::log::debug;
 use rand::{Rng, rngs::ThreadRng};
 use rustgo::backend::{Coord, Engine, Stone};
 
@@ -27,9 +26,8 @@ fn main() {
             );
             if res.is_ok() {
                 stone = stone.next_stone(N_PLAYER);
-
-                let _ = debug!("{:?}", res);
-                debug!("{}", engine.board_string());
+                let _ = println!("{:?}", res);
+                println!("{}", engine.board_string());
                 moves += 1;
                 continue 'outer;
             }
