@@ -65,13 +65,42 @@ impl Engine {
 
     pub fn new_with_board(size: usize, board: Board) -> Self {
         debug_assert!(size * size == board.len());
-        Engine {
+        let mut engine = Engine {
             size,
             board,
             group_ds: DisjointSet::new(size * size),
             group_info_array: GroupInfoArray::new(size * size),
             history_states: VecDeque::with_capacity(MAX_STATES_RECORD),
+        };
+
+        // 对于每个坐标的棋子，向右向下与同色棋子连接
+        for cur_idx in 0..engine.board.len() {
+            let cur_stone = engine.board[cur_idx];
+
+            if cur_stone != Stone::VOID {
+                engine.group_ds.insert(cur_idx);
+
+                if let Some(neighbor_idx) = engine.right_neighbor(cur_idx) {
+                    if engine.board[neighbor_idx] == cur_stone {
+                        engine.group_ds.connect(cur_idx, neighbor_idx);
+                    }
+                }
+                if let Some(neighbor_idx) = engine.down_neighbor(cur_idx) {
+                    if engine.board[neighbor_idx] == cur_stone {
+                        engine.group_ds.connect(cur_idx, neighbor_idx);
+                    }
+                }
+            }
         }
+
+        // 对于所有组，生成 group_info_array 的记录
+        for root_idx in engine.group_ds.group_roots() {
+            let members = engine.group_ds.group_members(root_idx).unwrap();
+            engine.group_info_array[root_idx] =
+                Some(GroupInfo::new(engine.calc_qi(&members), members))
+        }
+
+        return engine;
     }
 
     fn idx(&self, coord: Coord) -> Idx {
@@ -99,6 +128,26 @@ impl Engine {
         return v;
     }
 
+    fn right_neighbor(&self, idx: Idx) -> Option<Idx> {
+        let y = idx / self.size;
+        let x = idx % self.size;
+        if x < self.size - 1 {
+            return Some((x + 1) + self.size * (y));
+        } else {
+            return None;
+        }
+    }
+
+    fn down_neighbor(&self, idx: Idx) -> Option<Idx> {
+        let y = idx / self.size;
+        let x = idx % self.size;
+        if y < self.size - 1 {
+            return Some((x) + self.size * (y + 1));
+        } else {
+            return None;
+        }
+    }
+
     fn neighbor_groups(&mut self, idx: Idx) -> Vec<Idx> {
         let mut v: Vec<Idx> = Vec::new(); // TODO array vec on stack
         let y = idx / self.size;
@@ -107,25 +156,25 @@ impl Engine {
         if x > 0 {
             neigbor_idx = (x - 1) + self.size * (y);
             if self.have_stone(neigbor_idx) {
-                push_if_not_exist(&mut v, self.group_ds.find_root(neigbor_idx));
+                push_if_not_exist(&mut v, self.group_ds.find_root(neigbor_idx).unwrap());
             }
         }
         if x < self.size - 1 {
             neigbor_idx = (x + 1) + self.size * (y);
             if self.have_stone(neigbor_idx) {
-                push_if_not_exist(&mut v, self.group_ds.find_root(neigbor_idx));
+                push_if_not_exist(&mut v, self.group_ds.find_root(neigbor_idx).unwrap());
             }
         }
         if y > 0 {
             neigbor_idx = (x) + self.size * (y - 1);
             if self.have_stone(neigbor_idx) {
-                push_if_not_exist(&mut v, self.group_ds.find_root(neigbor_idx));
+                push_if_not_exist(&mut v, self.group_ds.find_root(neigbor_idx).unwrap());
             }
         }
         if y < self.size - 1 {
             neigbor_idx = (x) + self.size * (y + 1);
             if self.have_stone(neigbor_idx) {
-                push_if_not_exist(&mut v, self.group_ds.find_root(neigbor_idx));
+                push_if_not_exist(&mut v, self.group_ds.find_root(neigbor_idx).unwrap());
             }
         }
         return v;
@@ -152,14 +201,14 @@ impl Engine {
         for idx in 0..self.board.len() {
             if self.have_stone(idx) {
                 let mut tmp = self.group_ds.clone();
-                let root_idx = tmp.find_root(idx);
+                let root_idx = tmp.find_root(idx).unwrap();
 
                 let group_info = self.group_info_array.get(root_idx);
 
                 // check group members
                 let b: Vec<usize> = group_info.members.clone();
                 let b: HashSet<usize> = b.into_iter().collect();
-                let a: Vec<usize> = tmp.group_members(idx);
+                let a: Vec<usize> = tmp.group_members(idx).unwrap();
                 let a: HashSet<usize> = a.into_iter().collect();
                 debug_assert!(HashSet::difference(&a, &b).count() == 0);
 
@@ -199,7 +248,7 @@ impl Engine {
             if neighbor_stone == Stone::VOID {
                 cur_qi += 1;
             } else {
-                let root_idx = self.group_ds.find_root(neighbor_idx);
+                let root_idx = self.group_ds.find_root(neighbor_idx).unwrap();
                 let group_info = self.group_info_array.get(root_idx);
                 debug_assert!(group_info.members.len() > 0);
                 debug_assert!(group_info.qi > 0);
@@ -253,6 +302,7 @@ impl Engine {
         //     (此时气可能为0, 要等到提子后才还会被接着更新)
         if ally_groups.len() == 0 {
             // 自己成组
+            self.group_ds.insert(cur_idx);
             self.group_info_array[cur_idx] = Some(GroupInfo::new(cur_qi, vec![cur_idx]));
         } else {
             // TODO 很难归纳出通过简单加加减减merge group气的算法, 因为还需要考虑公气
@@ -264,7 +314,7 @@ impl Engine {
                 members.extend(group_info.members);
             }
 
-            let root_idx = self.group_ds.find_root(cur_idx);
+            let root_idx = self.group_ds.find_root(cur_idx).unwrap();
             let qi = self.calc_qi(&members);
 
             if self.group_info_array[root_idx].is_none() {

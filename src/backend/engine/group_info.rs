@@ -15,6 +15,7 @@ impl GroupInfo {
     }
 }
 
+#[derive(Debug)]
 pub struct GroupInfoArray(Array<Option<GroupInfo>>);
 
 impl GroupInfoArray {
