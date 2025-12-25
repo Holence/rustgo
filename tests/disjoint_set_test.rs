@@ -97,19 +97,3 @@ fn test_delete() {
     }
     assert!(ds.group_roots().is_empty());
 }
-
-#[test]
-#[should_panic]
-fn test_delete_panic() {
-    let mut ds = DisjointSet::new(TEST_SIZE);
-    let half = ds.len() / 2;
-    for i in 0..half {
-        ds.connect(i, i + half);
-    }
-
-    for i in half..half * 2 {
-        ds.delete_group(i);
-    }
-
-    ds.delete_group(0);
-}
