@@ -1,25 +1,17 @@
 use crate::backend::{Coord, Engine, EngineResult, Stone};
 
-impl Stone {
-    pub fn next(self) -> Stone {
-        match self {
-            Stone::Black => Stone::White,
-            Stone::White => Stone::Black,
-            Stone::Void => panic!(),
-        }
-    }
-}
-
 pub struct Game {
     engine: Engine,
-    next_stone: Stone,
+    n_player: usize,
+    cur_stone: Stone,
 }
 
 impl Game {
-    pub fn new(size: usize) -> Self {
+    pub fn new(size: usize, n_player: usize) -> Self {
         Self {
             engine: Engine::new(size),
-            next_stone: Stone::Black,
+            n_player: n_player,
+            cur_stone: Stone::BLACK,
         }
     }
 
@@ -32,8 +24,8 @@ impl Game {
     }
 
     pub fn place_stone(&mut self, coord: Coord) -> EngineResult {
-        let ret = self.engine.place_stone(coord, self.next_stone)?;
-        self.next_stone = self.next_stone.next();
+        let ret = self.engine.place_stone(coord, self.cur_stone)?;
+        self.cur_stone = self.cur_stone.next_stone(self.n_player);
         Ok(ret)
     }
 }

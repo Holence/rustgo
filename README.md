@@ -14,4 +14,3 @@
 - GTP with gnugo
 - learn cfg
   - use feature Conditional compilation
-- n色棋

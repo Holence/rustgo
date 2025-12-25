@@ -6,7 +6,7 @@ use rustgo::view::BoardView;
 fn main() {
     let mut siv = cursive::default();
 
-    let board = BoardView::new(19).with_name("board");
+    let board = BoardView::new(19, 2);
     let log_view = TextView::new("Log:\n").with_name("log").min_width(30);
 
     siv.add_layer(

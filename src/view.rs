@@ -35,9 +35,9 @@ const STAR: [(usize, usize); 9] = [
 ];
 
 impl BoardView {
-    pub fn new(size: usize) -> Self {
+    pub fn new(size: usize, n_player: usize) -> Self {
         Self {
-            game: Game::new(size),
+            game: Game::new(size, n_player),
         }
     }
 
@@ -82,22 +82,23 @@ impl View for BoardView {
         for y in 0..size {
             for x in 0..size {
                 let idx = y * size + x;
-                let text = match board[idx] {
-                    Stone::Void => {
+                let c = match board[idx] {
+                    Stone::VOID => {
                         if size == 19 && STAR.contains(&(x, y)) {
-                            "+"
+                            '+'
                         } else {
-                            "·"
+                            '·'
                         }
                     }
-                    stone => stone.as_str(),
+                    stone => stone.as_char(),
                 };
+
                 printer.print(
                     (
                         x * CELL_PER_X + BOARD_OFFSET_X,
                         y * CELL_PER_Y + BOARD_OFFSET_Y,
                     ),
-                    text,
+                    c.to_string().as_str(),
                 );
             }
         }

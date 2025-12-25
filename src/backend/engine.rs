@@ -56,7 +56,7 @@ impl Engine {
     pub fn new(size: usize) -> Self {
         Engine {
             size: size,
-            board: vec![Stone::Void; size * size].into_boxed_slice(),
+            board: vec![Stone::VOID; size * size].into_boxed_slice(),
             group_ds: DisjointSet::new(size * size),
             group_info_array: GroupInfoArray::new(size * size),
             history_states: VecDeque::with_capacity(MAX_STATES_RECORD),
@@ -132,7 +132,7 @@ impl Engine {
     }
 
     fn have_stone(&self, idx: Idx) -> bool {
-        self.board[idx] != Stone::Void
+        self.board[idx] != Stone::VOID
     }
 
     fn calc_qi(&self, members: &Vec<Idx>) -> usize {
@@ -173,7 +173,7 @@ impl Engine {
     }
 
     pub fn place_stone(&mut self, coord: Coord, stone: Stone) -> EngineResult {
-        debug_assert!(stone != Stone::Void);
+        debug_assert!(stone != Stone::VOID);
 
         #[cfg(debug_assertions)]
         self.verbose_check();
@@ -196,7 +196,7 @@ impl Engine {
         let mut eaten_groups: Vec<Idx> = Vec::with_capacity(4); // "提子组"
         for neighbor_idx in self.neighbors(cur_idx) {
             let neighbor_stone = self.board[neighbor_idx];
-            if neighbor_stone == Stone::Void {
+            if neighbor_stone == Stone::VOID {
                 cur_qi += 1;
             } else {
                 let root_idx = self.group_ds.find_root(neighbor_idx);
@@ -237,7 +237,7 @@ impl Engine {
         new_board[cur_idx] = stone;
         for &root_idx in &eaten_groups {
             for &idx in &(self.group_info_array.get(root_idx).members) {
-                new_board[idx] = Stone::Void;
+                new_board[idx] = Stone::VOID;
             }
         }
         for board in &self.history_states {
@@ -292,7 +292,7 @@ impl Engine {
             self.group_ds.delete_group(root_idx);
         }
         for &idx in &eaten_stones {
-            self.board[idx] = Stone::Void;
+            self.board[idx] = Stone::VOID;
         }
         for &idx in &eaten_stones {
             for root_idx in self.neighbor_groups(idx) {
