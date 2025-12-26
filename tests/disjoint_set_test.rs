@@ -6,13 +6,13 @@ const TEST_SIZE: usize = 15;
 fn test_empty() {
     let mut ds = DisjointSet::new(TEST_SIZE);
     for i in 0..ds.len() {
-        assert!(ds.contains(i) == false);
-        assert!(ds.find_root(i) == None);
-        assert!(ds.group_members(i) == None);
-        assert!(ds.group_size(i) == 0);
-        assert!(ds.is_connected(i, i) == false);
+        assert_eq!(ds.contains(i), false);
+        assert_eq!(ds.find_root(i), None);
+        assert_eq!(ds.group_members(i), None);
+        assert_eq!(ds.group_size(i), 0);
+        assert_eq!(ds.is_connected(i, i), false);
         if i != 0 {
-            assert!(ds.is_connected(i - 1, i) == false);
+            assert_eq!(ds.is_connected(i - 1, i), false);
         }
     }
     assert!(ds.group_roots().is_empty());
@@ -26,22 +26,22 @@ fn test_insert() {
         ds.insert(i);
     }
     for i in 0..half {
-        assert!(ds.contains(i) == true);
-        assert!(ds.find_root(i) == Some(i));
-        assert!(ds.group_members(i) == Some(vec![i]));
-        assert!(ds.group_size(i) == 1);
-        assert!(ds.is_connected(i, i) == true);
+        assert_eq!(ds.contains(i), true);
+        assert_eq!(ds.find_root(i), Some(i));
+        assert_eq!(ds.group_members(i), Some(vec![i]));
+        assert_eq!(ds.group_size(i), 1);
+        assert_eq!(ds.is_connected(i, i), true);
 
-        assert!(ds.is_connected(i, i + half) == false);
+        assert_eq!(ds.is_connected(i, i + half), false);
     }
     for i in half..half * 2 {
-        assert!(ds.contains(i) == false);
-        assert!(ds.find_root(i) == None);
-        assert!(ds.group_members(i) == None);
-        assert!(ds.group_size(i) == 0);
-        assert!(ds.is_connected(i, i) == false);
+        assert_eq!(ds.contains(i), false);
+        assert_eq!(ds.find_root(i), None);
+        assert_eq!(ds.group_members(i), None);
+        assert_eq!(ds.group_size(i), 0);
+        assert_eq!(ds.is_connected(i, i), false);
 
-        assert!(ds.is_connected(i, i - half) == false);
+        assert_eq!(ds.is_connected(i, i - half), false);
     }
 
     let roots: Vec<usize> = (0..half).collect();
@@ -56,21 +56,21 @@ fn test_connect() {
         ds.connect(i, i + half);
     }
     for i in 0..half {
-        assert!(ds.contains(i) == true);
-        assert!(ds.contains(i + half) == true);
+        assert_eq!(ds.contains(i), true);
+        assert_eq!(ds.contains(i + half), true);
         assert!(ds.find_root(i).is_some());
-        assert!(ds.find_root(i) == ds.find_root(i + half));
-        assert!(ds.group_members(i) == Some(vec![i, i + half]));
-        assert!(ds.group_members(i + half) == Some(vec![i, i + half]));
-        assert!(ds.group_size(i) == 2);
-        assert!(ds.group_size(i + half) == 2);
-        assert!(ds.is_connected(i, i) == true);
-        assert!(ds.is_connected(i, i + half) == true);
-        assert!(ds.is_connected(i + half, i) == true);
-        assert!(ds.is_connected(i + half, i + half) == true);
+        assert_eq!(ds.find_root(i), ds.find_root(i + half));
+        assert_eq!(ds.group_members(i), Some(vec![i, i + half]));
+        assert_eq!(ds.group_members(i + half), Some(vec![i, i + half]));
+        assert_eq!(ds.group_size(i), 2);
+        assert_eq!(ds.group_size(i + half), 2);
+        assert_eq!(ds.is_connected(i, i), true);
+        assert_eq!(ds.is_connected(i, i + half), true);
+        assert_eq!(ds.is_connected(i + half, i), true);
+        assert_eq!(ds.is_connected(i + half, i + half), true);
     }
 
-    assert!(ds.group_roots().len() == half);
+    assert_eq!(ds.group_roots().len(), half);
 }
 
 #[test]
@@ -86,13 +86,13 @@ fn test_delete() {
     }
 
     for i in 0..ds.len() {
-        assert!(ds.contains(i) == false);
-        assert!(ds.find_root(i) == None);
-        assert!(ds.group_members(i) == None);
-        assert!(ds.group_size(i) == 0);
-        assert!(ds.is_connected(i, i) == false);
+        assert_eq!(ds.contains(i), false);
+        assert_eq!(ds.find_root(i), None);
+        assert_eq!(ds.group_members(i), None);
+        assert_eq!(ds.group_size(i), 0);
+        assert_eq!(ds.is_connected(i, i), false);
         if i != 0 {
-            assert!(ds.is_connected(i - 1, i) == false);
+            assert_eq!(ds.is_connected(i - 1, i), false);
         }
     }
     assert!(ds.group_roots().is_empty());
