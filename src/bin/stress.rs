@@ -26,7 +26,7 @@ fn main() {
             );
             if res.is_ok() {
                 stone = stone.next_stone(N_PLAYER);
-                let _ = println!("{:?}", res);
+                println!("{:?}", res);
                 println!("{}", engine.board_string());
                 moves += 1;
                 continue 'outer;

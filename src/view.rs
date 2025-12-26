@@ -1,3 +1,6 @@
+#![allow(clippy::modulo_one)]
+#![allow(clippy::identity_op)]
+
 use cursive::{
     Printer, Vec2,
     direction::Direction,

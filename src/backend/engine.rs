@@ -281,7 +281,7 @@ impl Engine {
         }
 
         // 4. 禁止使己方气尽: 如果没有"提子组", 且`cur_qi==0`且所有"己方组"的"气"都是1, 则判定为自杀
-        if eaten_groups.len() == 0 {
+        if eaten_groups.is_empty() {
             if cur_qi == 0 {
                 let mut flag = false;
                 for &root_idx in &ally_groups {
@@ -290,7 +290,7 @@ impl Engine {
                         break;
                     }
                 }
-                if flag == false {
+                if !flag {
                     return Err("禁止使己方气尽");
                 }
             }
@@ -316,7 +316,7 @@ impl Engine {
 
         // 6.1 如果有"己方组", 则将落子与"己方组"merge, group root可能会更新, 在group root中更新"气"和members
         //     (此时气可能为0, 要等到提子后才还会被接着更新)
-        if ally_groups.len() == 0 {
+        if ally_groups.is_empty() {
             // 自己成组
             self.group_ds.insert(cur_idx);
             self.group_qi[cur_idx] = cur_qi;

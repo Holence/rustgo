@@ -1,3 +1,5 @@
+#![allow(clippy::bool_assert_comparison)]
+
 use rustgo::backend::DisjointSet;
 
 const TEST_SIZE: usize = 15;

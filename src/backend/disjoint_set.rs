@@ -40,13 +40,17 @@ impl DisjointSet {
         self.group_members.iter().filter(|x| x.is_some()).count()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     /// 寻找 idx 所属 group 的 group root
     ///
     /// 如果不存在 group, 则返回 None
     pub fn find_root(&mut self, idx: Idx) -> Option<Idx> {
         let parent_idx = self.parent_idx[idx];
         if parent_idx == NO_PARENT {
-            if self.group_members[idx] == None {
+            if self.group_members[idx].is_none() {
                 return None;
             } else {
                 return Some(idx);
@@ -82,9 +86,7 @@ impl DisjointSet {
     /// 返回 idx 所属 group 的所有 member (保证升序)
     pub fn group_members(&mut self, idx: Idx) -> Option<&Vec<Idx>> {
         let root = self.find_root(idx);
-        if root.is_none() {
-            return None;
-        }
+        root?;
 
         let root_idx = root.unwrap();
         let members = self.group_members[root_idx].as_mut().unwrap();
@@ -98,7 +100,7 @@ impl DisjointSet {
     pub fn group_roots(&mut self) -> Vec<Idx> {
         let mut roots: Vec<Idx> = vec![];
         for idx in 0..self.capacity() {
-            if self.group_members[idx] != None {
+            if self.group_members[idx].is_none() {
                 roots.push(idx);
             }
         }
@@ -149,7 +151,7 @@ impl DisjointSet {
 
     /// 是否存在元素
     pub fn contains(&self, idx: Idx) -> bool {
-        self.parent_idx[idx] != NO_PARENT || self.group_members[idx] != None
+        self.parent_idx[idx] != NO_PARENT || self.group_members[idx].is_some()
     }
 
     pub fn connect(&mut self, idx_a: Idx, idx_b: Idx) {
