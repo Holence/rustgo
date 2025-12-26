@@ -1,15 +1,7 @@
-use std::{
-    collections::{HashSet, VecDeque},
-    mem::replace,
-};
+use std::collections::{HashSet, VecDeque};
 
-use crate::backend::{
-    Array, Coord, Idx, Stone,
-    disjoint_set::DisjointSet,
-    engine::group_info::{GroupInfo, GroupInfoArray},
-};
+use crate::backend::{Array, Coord, Idx, Stone, disjoint_set::DisjointSet};
 
-mod group_info;
 const MAX_STATES_RECORD: usize = 30;
 
 #[derive(Debug)]
@@ -33,16 +25,16 @@ pub struct Engine {
     ///
     /// 同色、连续的棋子在运行时使用 disjoint set 记录分组
     ///
-    /// group root 所对应的下标 idx 在 self.group_info_array[idx] 中会记录额外的信息
+    /// group root 所对应的下标 idx 在 self.group_qi[idx] 中会记录"气"
     group_ds: DisjointSet,
 
-    /// 棋子组的额外信息
+    /// 棋子组的气
     ///
-    /// group_info_array.len() == size * size
+    /// group_qi.len() == size * size
     ///
-    /// 1. 只在 idx == group root 时, 才有 group_info_array[idx] == Some(Box<GroupInfo>)
-    /// 2. 其他情况, group_info_array[idx] == None
-    group_info_array: GroupInfoArray,
+    /// 1. 只在 idx == group root 时, 才有 group_qi[idx] == 棋子组的气
+    /// 2. 其他情况, group_qi[idx] == 0
+    group_qi: Array<usize>,
 
     /// 为了判断全局同形而记录的历史状态
     ///
@@ -58,7 +50,7 @@ impl Engine {
             size: size,
             board: vec![Stone::VOID; size * size].into_boxed_slice(),
             group_ds: DisjointSet::new(size * size),
-            group_info_array: GroupInfoArray::new(size * size),
+            group_qi: vec![0; size * size].into_boxed_slice(),
             history_states: VecDeque::with_capacity(MAX_STATES_RECORD),
         }
     }
@@ -69,7 +61,7 @@ impl Engine {
             size,
             board,
             group_ds: DisjointSet::new(size * size),
-            group_info_array: GroupInfoArray::new(size * size),
+            group_qi: vec![0; size * size].into_boxed_slice(),
             history_states: VecDeque::with_capacity(MAX_STATES_RECORD),
         };
 
@@ -93,11 +85,10 @@ impl Engine {
             }
         }
 
-        // 对于所有组，生成 group_info_array 的记录
+        // 对于所有组，计算 group_qi
         for root_idx in engine.group_ds.group_roots() {
-            let members = engine.group_ds.group_members(root_idx).unwrap().clone();
-            engine.group_info_array[root_idx] =
-                Some(GroupInfo::new(engine.calc_qi(&members), members))
+            let members = engine.group_ds.group_members(root_idx).unwrap();
+            engine.group_qi[root_idx] = engine.calc_qi(&members);
         }
 
         return engine;
@@ -184,12 +175,39 @@ impl Engine {
         self.board[idx] != Stone::VOID
     }
 
+    /// 计算同色棋子组
+    ///
+    /// 除了测试，应该没有地方需要使用这个函数，因为 self.group_ds 里已经在 connect 的过程中动态更新 group_members 了
+    fn allies(&self, idx: Idx) -> Vec<Idx> {
+        let cur_stone = self.board[idx];
+        assert!(cur_stone != Stone::VOID);
+
+        let mut allies_set: HashSet<Idx> = HashSet::new();
+        allies_set.insert(idx);
+
+        let mut wait_to_visit = VecDeque::new();
+        wait_to_visit.push_back(idx);
+        while !wait_to_visit.is_empty() {
+            let cur_idx = wait_to_visit.pop_front().unwrap();
+            for neighbor_idx in self.neighbors(cur_idx) {
+                if self.have_stone(neighbor_idx) && self.board[neighbor_idx] == cur_stone {
+                    if !allies_set.contains(&neighbor_idx) {
+                        allies_set.insert(neighbor_idx);
+                        wait_to_visit.push_back(neighbor_idx);
+                    }
+                }
+            }
+        }
+
+        return allies_set.into_iter().collect();
+    }
+
     fn calc_qi(&self, members: &Vec<Idx>) -> usize {
         let mut voids: HashSet<Idx> = HashSet::with_capacity(members.len());
         for &idx in members {
-            for neighbor in self.neighbors(idx) {
-                if !self.have_stone(neighbor) {
-                    voids.insert(neighbor);
+            for neighbor_idx in self.neighbors(idx) {
+                if !self.have_stone(neighbor_idx) {
+                    voids.insert(neighbor_idx);
                 }
             }
         }
@@ -201,20 +219,18 @@ impl Engine {
         for idx in 0..self.board.len() {
             if self.have_stone(idx) {
                 let mut tmp = self.group_ds.clone();
-                let root_idx = tmp.find_root(idx).unwrap();
-
-                let group_info = self.group_info_array.get(root_idx);
 
                 // check group members
-                let b: Vec<usize> = group_info.members.clone();
-                let b: HashSet<usize> = b.into_iter().collect();
-                let a: Vec<usize> = tmp.group_members(idx).unwrap().clone();
-                let a: HashSet<usize> = a.into_iter().collect();
-                debug_assert!(HashSet::difference(&a, &b).count() == 0);
+                let a: Vec<Idx> = tmp.group_members(idx).unwrap();
+                let a: HashSet<Idx> = a.into_iter().collect();
+                let b: Vec<Idx> = self.allies(idx);
+                let b: HashSet<Idx> = b.into_iter().collect();
+                debug_assert_eq!(a, b);
 
                 // check 气
-                debug_assert!(group_info.qi != 0);
-                debug_assert!(self.calc_qi(&group_info.members) == group_info.qi);
+                let members: Vec<Idx> = tmp.group_members(idx).unwrap();
+                let root_idx = tmp.find_root(idx).unwrap();
+                debug_assert_eq!(self.calc_qi(&members), self.group_qi[root_idx]);
 
                 // TODO check 连接性
             }
@@ -249,13 +265,13 @@ impl Engine {
                 cur_qi += 1;
             } else {
                 let root_idx = self.group_ds.find_root(neighbor_idx).unwrap();
-                let group_info = self.group_info_array.get(root_idx);
-                debug_assert!(group_info.members.len() > 0);
-                debug_assert!(group_info.qi > 0);
+                let group_qi = self.group_qi[root_idx];
+                debug_assert!(self.group_ds.group_size(root_idx) > 0);
+                debug_assert!(group_qi > 0);
                 if neighbor_stone == stone {
                     push_if_not_exist(&mut ally_groups, root_idx);
                 } else {
-                    if group_info.qi == 1 {
+                    if group_qi == 1 {
                         push_if_not_exist(&mut eaten_groups, root_idx);
                     } else {
                         push_if_not_exist(&mut opponent_groups, root_idx);
@@ -269,7 +285,7 @@ impl Engine {
             if cur_qi == 0 {
                 let mut flag = false;
                 for &root_idx in &ally_groups {
-                    if self.group_info_array.get(root_idx).qi != 1 {
+                    if self.group_qi[root_idx] != 1 {
                         flag = true;
                         break;
                     }
@@ -285,7 +301,7 @@ impl Engine {
         let mut new_board = self.board.clone();
         new_board[cur_idx] = stone;
         for &root_idx in &eaten_groups {
-            for &idx in &(self.group_info_array.get(root_idx).members) {
+            for &idx in &(self.group_ds.group_members(root_idx).unwrap()) {
                 new_board[idx] = Stone::VOID;
             }
         }
@@ -303,32 +319,24 @@ impl Engine {
         if ally_groups.len() == 0 {
             // 自己成组
             self.group_ds.insert(cur_idx);
-            self.group_info_array[cur_idx] = Some(GroupInfo::new(cur_qi, vec![cur_idx]));
+            self.group_qi[cur_idx] = cur_qi;
         } else {
             // TODO 很难归纳出通过简单加加减减merge group气的算法, 因为还需要考虑公气
-            // 这里直接粗暴merge, 再重新计算整个group的气
-            let mut members: Vec<Idx> = vec![cur_idx];
+
+            // 这里直接粗暴merge
             for root_idx in ally_groups {
                 self.group_ds.connect(cur_idx, root_idx);
-                let group_info = self.group_info_array[root_idx].take().unwrap(); // take out, and free
-                members.extend(group_info.members);
+                self.group_qi[root_idx] = 0;
             }
-
+            // 重新计算整个group的气
             let root_idx = self.group_ds.find_root(cur_idx).unwrap();
-            let qi = self.calc_qi(&members);
-
-            if self.group_info_array[root_idx].is_none() {
-                self.group_info_array[root_idx] = Some(GroupInfo::new(qi, members));
-            } else {
-                let group_info = self.group_info_array.get_mut(root_idx);
-                group_info.qi = qi;
-                let _ = replace(&mut group_info.members, members);
-            }
+            let members = self.group_ds.group_members(root_idx).unwrap();
+            self.group_qi[root_idx] = self.calc_qi(&members);
         }
 
         // 6.2 如果有"非己方组"且不是"提子组", 则用落子更新"气"
         for root_idx in opponent_groups {
-            self.group_info_array.get_mut(root_idx).qi -= 1;
+            self.group_qi[root_idx] -= 1;
         }
 
         // 6.3 如果有"提子组", 则把所有"提子组"的members统计为一个list, 棋盘上这些坐标置空, 遍历list, 对于每个member遗址, 更新遗址周围的组的"气"
@@ -337,8 +345,8 @@ impl Engine {
         // TODO test n色棋
         let mut eaten_stones: Vec<Idx> = vec![];
         for root_idx in eaten_groups {
-            let group = self.group_info_array[root_idx].take().unwrap(); // take out, and free
-            eaten_stones.extend(group.members);
+            self.group_qi[root_idx] = 0;
+            eaten_stones.append(&mut self.group_ds.group_members(root_idx).unwrap());
             self.group_ds.delete_group(root_idx);
         }
         for &idx in &eaten_stones {
@@ -346,7 +354,7 @@ impl Engine {
         }
         for &idx in &eaten_stones {
             for root_idx in self.neighbor_groups(idx) {
-                self.group_info_array.get_mut(root_idx).qi += 1;
+                self.group_qi[root_idx] += 1;
             }
         }
 

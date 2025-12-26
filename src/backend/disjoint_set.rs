@@ -82,7 +82,7 @@ impl DisjointSet {
         let root_idx = root.unwrap();
         let members = self.group_members[root_idx].as_mut().unwrap();
         members.sort(); // 排序不放在 connect 里, 因为 connect 调用的更频繁, group_members 很少被调用
-        return Some(members.clone());
+        return Some(members.clone()); // TODO return ref
     }
 
     /// 返回所有的 group root
@@ -101,6 +101,7 @@ impl DisjointSet {
     /// 删除 idx 所属 group 的所有元素
     ///
     /// 如果不存在 group, 则什么都不做
+    /// TODO return group members
     pub fn delete_group(&mut self, idx: Idx) {
         let root = self.find_root(idx);
         if root.is_none() {
