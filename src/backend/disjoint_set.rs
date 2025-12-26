@@ -19,6 +19,7 @@ pub struct DisjointSet {
 }
 
 impl DisjointSet {
+    /// 创建容量为 `capacity` 的并查集 (目前的实现是不可扩容的)
     pub fn new(capacity: usize) -> Self {
         // TODO 能否在new时通过判断capacity的大小范围, 创建不同的 DisjointSet<T>
         // TODO 大部分情况 都有 capacity <= u16::MAX, 可以不用 usize 存
@@ -29,8 +30,14 @@ impl DisjointSet {
         }
     }
 
-    pub fn len(&self) -> usize {
+    /// 最大能承载多少元素
+    pub fn capacity(&self) -> usize {
         return self.parent_idx.len();
+    }
+
+    /// 已经存储了多少元素
+    pub fn len(&self) -> usize {
+        self.group_members.iter().filter(|x| x.is_some()).count()
     }
 
     /// 寻找 idx 所属 group 的 group root
@@ -55,7 +62,7 @@ impl DisjointSet {
 
     /// 强制做一次路径压缩, 一般情况无须手动调用
     pub fn run_path_compression(&mut self) {
-        for idx in 0..self.len() {
+        for idx in 0..self.capacity() {
             self.find_root(idx);
         }
     }
@@ -90,7 +97,7 @@ impl DisjointSet {
     /// 时间复杂度 O(N)
     pub fn group_roots(&mut self) -> Vec<Idx> {
         let mut roots: Vec<Idx> = vec![];
-        for idx in 0..self.len() {
+        for idx in 0..self.capacity() {
             if self.group_members[idx] != None {
                 roots.push(idx);
             }
@@ -176,7 +183,7 @@ impl Debug for DisjointSet {
         // root_idx -> member_idxs
         let mut groups: BTreeMap<Idx, Vec<Idx>> = BTreeMap::new();
 
-        for idx in 0..tmp.len() {
+        for idx in 0..tmp.capacity() {
             let root = tmp.find_root(idx);
             if let Some(root_idx) = root {
                 groups.entry(root_idx).or_default().push(idx);

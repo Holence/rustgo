@@ -5,7 +5,7 @@ const TEST_SIZE: usize = 15;
 #[test]
 fn test_empty() {
     let mut ds = DisjointSet::new(TEST_SIZE);
-    for i in 0..ds.len() {
+    for i in 0..ds.capacity() {
         assert_eq!(ds.contains(i), false);
         assert_eq!(ds.find_root(i), None);
         assert_eq!(ds.group_members(i), None);
@@ -15,13 +15,17 @@ fn test_empty() {
             assert_eq!(ds.is_connected(i - 1, i), false);
         }
     }
+
+    assert_eq!(ds.capacity(), TEST_SIZE);
+    assert_eq!(ds.len(), 0);
+
     assert!(ds.group_roots().is_empty());
 }
 
 #[test]
 fn test_insert() {
     let mut ds = DisjointSet::new(TEST_SIZE);
-    let half = ds.len() / 2;
+    let half = ds.capacity() / 2;
     for i in 0..half {
         ds.insert(i);
     }
@@ -44,6 +48,9 @@ fn test_insert() {
         assert_eq!(ds.is_connected(i, i - half), false);
     }
 
+    assert_eq!(ds.capacity(), TEST_SIZE);
+    assert_eq!(ds.len(), half);
+
     let roots: Vec<usize> = (0..half).collect();
     assert_eq!(ds.group_roots(), roots);
 }
@@ -51,7 +58,7 @@ fn test_insert() {
 #[test]
 fn test_connect() {
     let mut ds = DisjointSet::new(TEST_SIZE);
-    let half = ds.len() / 2;
+    let half = ds.capacity() / 2;
     for i in 0..half {
         ds.connect(i, i + half);
     }
@@ -70,13 +77,16 @@ fn test_connect() {
         assert_eq!(ds.is_connected(i + half, i + half), true);
     }
 
+    assert_eq!(ds.capacity(), TEST_SIZE);
+    assert_eq!(ds.len(), half);
+
     assert_eq!(ds.group_roots().len(), half);
 }
 
 #[test]
 fn test_delete() {
     let mut ds = DisjointSet::new(TEST_SIZE);
-    let half = ds.len() / 2;
+    let half = ds.capacity() / 2;
     for i in 0..half {
         ds.connect(i, i + half);
     }
@@ -85,7 +95,7 @@ fn test_delete() {
         assert_eq!(ds.delete_group(i), vec![i - half, i]);
     }
 
-    for i in 0..ds.len() {
+    for i in 0..ds.capacity() {
         assert_eq!(ds.contains(i), false);
         assert_eq!(ds.find_root(i), None);
         assert_eq!(ds.group_members(i), None);
@@ -95,5 +105,9 @@ fn test_delete() {
             assert_eq!(ds.is_connected(i - 1, i), false);
         }
     }
+
+    assert_eq!(ds.capacity(), TEST_SIZE);
+    assert_eq!(ds.len(), 0);
+
     assert!(ds.group_roots().is_empty());
 }
