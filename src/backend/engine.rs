@@ -87,7 +87,7 @@ impl Engine {
 
         // 对于所有组，计算 group_qi
         for root_idx in engine.group_ds.group_roots() {
-            let members = engine.group_ds.group_members(root_idx).unwrap();
+            let members = engine.group_ds.group_members(root_idx).unwrap().clone();
             engine.group_qi[root_idx] = engine.calc_qi(&members);
         }
 
@@ -219,18 +219,18 @@ impl Engine {
         for idx in 0..self.board.len() {
             if self.have_stone(idx) {
                 let mut tmp = self.group_ds.clone();
+                let root_idx = tmp.find_root(idx).unwrap();
+                let members: Vec<usize> = tmp.group_members(root_idx).unwrap().clone();
 
                 // check group members
-                let a: Vec<Idx> = tmp.group_members(idx).unwrap();
-                let a: HashSet<Idx> = a.into_iter().collect();
-                let b: Vec<Idx> = self.allies(idx);
-                let b: HashSet<Idx> = b.into_iter().collect();
+                let a: HashSet<Idx> = members.clone().into_iter().collect();
+                let b: HashSet<Idx> = self.allies(idx).into_iter().collect();
                 debug_assert_eq!(a, b);
 
                 // check 气
-                let members: Vec<Idx> = tmp.group_members(idx).unwrap();
-                let root_idx = tmp.find_root(idx).unwrap();
-                debug_assert_eq!(self.calc_qi(&members), self.group_qi[root_idx]);
+                let a = self.group_qi[root_idx];
+                let b = self.calc_qi(&members);
+                debug_assert_eq!(a, b);
 
                 // TODO check 连接性
             }
@@ -301,7 +301,7 @@ impl Engine {
         let mut new_board = self.board.clone();
         new_board[cur_idx] = stone;
         for &root_idx in &eaten_groups {
-            for &idx in &(self.group_ds.group_members(root_idx).unwrap()) {
+            for &idx in self.group_ds.group_members(root_idx).unwrap() {
                 new_board[idx] = Stone::VOID;
             }
         }
@@ -330,7 +330,7 @@ impl Engine {
             }
             // 重新计算整个group的气
             let root_idx = self.group_ds.find_root(cur_idx).unwrap();
-            let members = self.group_ds.group_members(root_idx).unwrap();
+            let members = self.group_ds.group_members(root_idx).unwrap().clone();
             self.group_qi[root_idx] = self.calc_qi(&members);
         }
 
@@ -346,8 +346,8 @@ impl Engine {
         let mut eaten_stones: Vec<Idx> = vec![];
         for root_idx in eaten_groups {
             self.group_qi[root_idx] = 0;
-            eaten_stones.append(&mut self.group_ds.group_members(root_idx).unwrap());
-            self.group_ds.delete_group(root_idx);
+
+            eaten_stones.append(&mut self.group_ds.delete_group(root_idx));
         }
         for &idx in &eaten_stones {
             self.board[idx] = Stone::VOID;

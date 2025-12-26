@@ -73,7 +73,7 @@ impl DisjointSet {
     }
 
     /// 返回 idx 所属 group 的所有 member (保证升序)
-    pub fn group_members(&mut self, idx: Idx) -> Option<Vec<Idx>> {
+    pub fn group_members(&mut self, idx: Idx) -> Option<&Vec<Idx>> {
         let root = self.find_root(idx);
         if root.is_none() {
             return None;
@@ -81,8 +81,8 @@ impl DisjointSet {
 
         let root_idx = root.unwrap();
         let members = self.group_members[root_idx].as_mut().unwrap();
-        members.sort(); // 排序不放在 connect 里, 因为 connect 调用的更频繁, group_members 很少被调用
-        return Some(members.clone()); // TODO return ref
+        members.sort_unstable(); // 排序不放在 connect 里, 因为 connect 调用的更频繁
+        return Some(members);
     }
 
     /// 返回所有的 group root
@@ -98,22 +98,25 @@ impl DisjointSet {
         return roots;
     }
 
-    /// 删除 idx 所属 group 的所有元素
+    /// 删除 idx 所属 group 的所有 members, 并返回该 group 的 members (保证升序)
     ///
-    /// 如果不存在 group, 则什么都不做
-    /// TODO return group members
-    pub fn delete_group(&mut self, idx: Idx) {
+    /// # Panic
+    ///
+    /// 如果不存在 group, 则 Panic
+    pub fn delete_group(&mut self, idx: Idx) -> Vec<Idx> {
         let root = self.find_root(idx);
         if root.is_none() {
-            return;
+            panic!("idx should belong to a group!");
         }
         let root_idx = root.unwrap();
 
-        let members = self.group_members[root_idx].take().unwrap(); // take out, leave as None
-        for idx in members {
+        let mut members = self.group_members[root_idx].take().unwrap(); // take out, leave as None
+        for &idx in &members {
             // 恢复初始值
             self.parent_idx[idx] = NO_PARENT;
         }
+        members.sort_unstable(); // 排序不放在 connect 里, 因为 connect 调用的更频繁
+        return members;
     }
 
     pub fn is_connected(&mut self, idx_a: Idx, idx_b: Idx) -> bool {

@@ -28,7 +28,7 @@ fn test_insert() {
     for i in 0..half {
         assert_eq!(ds.contains(i), true);
         assert_eq!(ds.find_root(i), Some(i));
-        assert_eq!(ds.group_members(i), Some(vec![i]));
+        assert_eq!(ds.group_members(i), Some(&vec![i]));
         assert_eq!(ds.group_size(i), 1);
         assert_eq!(ds.is_connected(i, i), true);
 
@@ -60,8 +60,8 @@ fn test_connect() {
         assert_eq!(ds.contains(i + half), true);
         assert!(ds.find_root(i).is_some());
         assert_eq!(ds.find_root(i), ds.find_root(i + half));
-        assert_eq!(ds.group_members(i), Some(vec![i, i + half]));
-        assert_eq!(ds.group_members(i + half), Some(vec![i, i + half]));
+        assert_eq!(ds.group_members(i), Some(&vec![i, i + half]));
+        assert_eq!(ds.group_members(i + half), Some(&vec![i, i + half]));
         assert_eq!(ds.group_size(i), 2);
         assert_eq!(ds.group_size(i + half), 2);
         assert_eq!(ds.is_connected(i, i), true);
@@ -82,7 +82,7 @@ fn test_delete() {
     }
 
     for i in half..half * 2 {
-        ds.delete_group(i);
+        assert_eq!(ds.delete_group(i), vec![i - half, i]);
     }
 
     for i in 0..ds.len() {
