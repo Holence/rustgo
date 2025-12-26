@@ -95,7 +95,7 @@ impl Engine {
 
         // 对于所有组，生成 group_info_array 的记录
         for root_idx in engine.group_ds.group_roots() {
-            let members = engine.group_ds.group_members(root_idx).unwrap();
+            let members = engine.group_ds.group_members(root_idx).unwrap().clone();
             engine.group_info_array[root_idx] =
                 Some(GroupInfo::new(engine.calc_qi(&members), members))
         }
@@ -208,7 +208,7 @@ impl Engine {
                 // check group members
                 let b: Vec<usize> = group_info.members.clone();
                 let b: HashSet<usize> = b.into_iter().collect();
-                let a: Vec<usize> = tmp.group_members(idx).unwrap();
+                let a: Vec<usize> = tmp.group_members(idx).unwrap().clone();
                 let a: HashSet<usize> = a.into_iter().collect();
                 debug_assert!(HashSet::difference(&a, &b).count() == 0);
 
