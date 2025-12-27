@@ -85,10 +85,7 @@ impl DisjointSet {
 
     /// 返回 idx 所属 group 的所有 member (保证升序)
     pub fn group_members(&mut self, idx: Idx) -> Option<&Vec<Idx>> {
-        let root = self.find_root(idx);
-        root?;
-
-        let root_idx = root.unwrap();
+        let root_idx = self.find_root(idx)?;
         let members = self.group_members[root_idx].as_mut().unwrap();
         members.sort_unstable(); // 排序不放在 connect 里, 因为 connect 调用的更频繁
         return Some(members);
@@ -100,7 +97,7 @@ impl DisjointSet {
     pub fn group_roots(&mut self) -> Vec<Idx> {
         let mut roots: Vec<Idx> = vec![];
         for idx in 0..self.capacity() {
-            if self.group_members[idx].is_none() {
+            if self.group_members[idx].is_some() {
                 roots.push(idx);
             }
         }
