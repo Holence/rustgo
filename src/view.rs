@@ -82,7 +82,10 @@ impl View for BoardView {
         let size = self.game.size();
         let board = self.game.board();
 
+        let mut line = String::with_capacity(size);
         for y in 0..size {
+            line.clear();
+            line.push(' ');
             for x in 0..size {
                 let idx = y * size + x;
                 let c = match board[idx] {
@@ -95,15 +98,10 @@ impl View for BoardView {
                     }
                     stone => stone.as_char(),
                 };
-
-                printer.print(
-                    (
-                        x * CELL_PER_X + BOARD_OFFSET_X,
-                        y * CELL_PER_Y + BOARD_OFFSET_Y,
-                    ),
-                    c.to_string().as_str(),
-                );
+                line.push(c);
+                line.push(' ');
             }
+            printer.print((0, y * CELL_PER_Y + BOARD_OFFSET_Y), &line);
         }
     }
 
