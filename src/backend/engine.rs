@@ -11,7 +11,7 @@ pub struct PlaceStoneResult {
 
 pub type EngineResult = Result<PlaceStoneResult, &'static str>; // TODO err type
 
-pub type Board = Array<Stone>;
+pub type BoardState = Array<Stone>;
 
 pub struct Engine {
     size: usize,
@@ -19,7 +19,7 @@ pub struct Engine {
     /// 棋盘所有坐标位置的一维存储 ( 2D_board[y][x] == board[y*size+x] ), 以左上角为原点, 向下为+y, 向右为+x
     ///
     /// board.len() == size * size
-    board: Board,
+    board: BoardState,
 
     /// 棋子的分组信息
     ///
@@ -41,7 +41,7 @@ pub struct Engine {
     /// 不需要记录全部的历史状态, 只需要记录最新的 ? 条即可 (TODO N劫循环的循环周期为多少)
     ///
     /// 新记录 push_front, 超出的 pop_back
-    history_states: VecDeque<Board>, // TODO fixed size deque
+    history_board_states: VecDeque<BoardState>, // TODO fixed size deque
 }
 
 impl Engine {
@@ -51,18 +51,18 @@ impl Engine {
             board: vec![Stone::VOID; size * size].into_boxed_slice(),
             group_ds: DisjointSet::new(size * size),
             group_qi: vec![0; size * size].into_boxed_slice(),
-            history_states: VecDeque::with_capacity(MAX_STATES_RECORD),
+            history_board_states: VecDeque::with_capacity(MAX_STATES_RECORD),
         }
     }
 
-    pub fn new_with_board(size: usize, board: Board) -> Self {
+    pub fn new_with_board(size: usize, board: BoardState) -> Self {
         debug_assert!(size * size == board.len());
         let mut engine = Engine {
             size,
             board,
             group_ds: DisjointSet::new(size * size),
             group_qi: vec![0; size * size].into_boxed_slice(),
-            history_states: VecDeque::with_capacity(MAX_STATES_RECORD),
+            history_board_states: VecDeque::with_capacity(MAX_STATES_RECORD),
         };
 
         // 对于每个坐标的棋子，向右向下与同色棋子连接
@@ -305,7 +305,7 @@ impl Engine {
                 new_board[idx] = Stone::VOID;
             }
         }
-        for board in &self.history_states {
+        for board in &self.history_board_states {
             if *board == new_board {
                 return Err("禁止全局同形");
             }
@@ -359,10 +359,10 @@ impl Engine {
         }
 
         debug_assert!(new_board == self.board);
-        if self.history_states.len() == MAX_STATES_RECORD {
-            self.history_states.pop_back();
+        if self.history_board_states.len() == MAX_STATES_RECORD {
+            self.history_board_states.pop_back();
         }
-        self.history_states.push_front(new_board);
+        self.history_board_states.push_front(new_board);
 
         Ok(PlaceStoneResult {
             eaten_stones: eaten_stones

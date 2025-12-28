@@ -7,5 +7,5 @@ mod stone;
 pub use common::*;
 pub use coord::Coord;
 pub use disjoint_set::DisjointSet;
-pub use engine::{Board, Engine, EngineResult};
+pub use engine::{BoardState, Engine, EngineResult};
 pub use stone::Stone;

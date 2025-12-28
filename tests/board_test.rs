@@ -1,4 +1,4 @@
-use rustgo::backend::{Board, Coord, Engine, Stone};
+use rustgo::backend::{BoardState, Coord, Engine, Stone};
 
 const VOID: Stone = Stone::VOID;
 const BLACK: Stone = Stone::BLACK;
@@ -27,7 +27,7 @@ ___
 #[test]
 fn test_2() {
     #[rustfmt::skip]
-    let board :Board = Box::new([
+    let board: BoardState = Box::new([
         VOID, BLACK, VOID,
         BLACK, VOID, BLACK,
         VOID, BLACK, VOID,
@@ -40,7 +40,7 @@ fn test_2() {
 #[test]
 fn test_3() {
     #[rustfmt::skip]
-    let board :Board = Box::new([
+    let board: BoardState = Box::new([
         VOID, BLACK, VOID,
         BLACK, VOID, BLACK,
         VOID, BLACK, VOID,
