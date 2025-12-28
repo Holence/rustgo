@@ -1,5 +1,5 @@
 use rand::{Rng, rngs::ThreadRng};
-use rustgo::backend::{Coord, Engine, Stone};
+use rustgo::backend::{Coord, Board, Stone};
 
 fn random_number(rng: &mut ThreadRng, size: usize) -> usize {
     (rng.random::<u32>() % (size as u32)) as usize
@@ -11,7 +11,7 @@ const BOARD_SIZE: usize = 42;
 fn main() {
     let mut rng = rand::rng(); // a local handle to the generator
 
-    let mut engine = Engine::new(BOARD_SIZE);
+    let mut engine = Board::new(BOARD_SIZE);
     let mut stone = Stone::BLACK;
     let mut moves: usize = 0;
     'outer: for _ in 0..1000000 {

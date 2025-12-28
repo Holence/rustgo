@@ -65,9 +65,9 @@ impl BoardView {
         let coord = Coord::new(pos.x, pos.y);
         let result = self.game.place_stone(coord);
         match result {
-            Ok(action) => {
+            Ok(eaten) => {
                 // TODO
-                action.eaten_stones;
+                eaten;
                 EventResult::with_cb_once(move |s| append_log(s, coord.to_string()))
             }
             Err(msg) => EventResult::with_cb(move |s| {

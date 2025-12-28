@@ -4,16 +4,11 @@ use crate::backend::{Array, Coord, Idx, Stone, disjoint_set::DisjointSet};
 
 const MAX_STATES_RECORD: usize = 30;
 
-#[derive(Debug)]
-pub struct PlaceStoneResult {
-    pub eaten_stones: Vec<Coord>, // 吃子坐标
-}
-
-pub type EngineResult = Result<PlaceStoneResult, &'static str>; // TODO err type
+pub type PlaceStoneResult = Result<Vec<Coord>, &'static str>; // TODO err type
 
 pub type BoardState = Array<Stone>;
 
-pub struct Engine {
+pub struct Board {
     size: usize,
 
     /// 棋盘所有坐标位置的一维存储 ( 2D_board[y][x] == board[y*size+x] ), 以左上角为原点, 向下为+y, 向右为+x
@@ -44,9 +39,9 @@ pub struct Engine {
     history_board_states: VecDeque<BoardState>, // TODO fixed size deque
 }
 
-impl Engine {
+impl Board {
     pub fn new(size: usize) -> Self {
-        Engine {
+        Board {
             size: size,
             board: vec![Stone::VOID; size * size].into_boxed_slice(),
             group_ds: DisjointSet::new(size * size),
@@ -57,7 +52,7 @@ impl Engine {
 
     pub fn new_with_board(size: usize, board: BoardState) -> Self {
         debug_assert!(size * size == board.len());
-        let mut engine = Engine {
+        let mut engine = Board {
             size,
             board,
             group_ds: DisjointSet::new(size * size),
@@ -237,7 +232,7 @@ impl Engine {
         }
     }
 
-    pub fn place_stone(&mut self, coord: Coord, stone: Stone) -> EngineResult {
+    pub fn place_stone(&mut self, coord: Coord, stone: Stone) -> PlaceStoneResult {
         debug_assert!(stone != Stone::VOID);
 
         #[cfg(debug_assertions)]
@@ -364,12 +359,10 @@ impl Engine {
         }
         self.history_board_states.push_front(new_board);
 
-        Ok(PlaceStoneResult {
-            eaten_stones: eaten_stones
-                .iter()
-                .map(|idx| Coord::new(idx % self.size, idx / self.size))
-                .collect(),
-        })
+        Ok(eaten_stones
+            .iter()
+            .map(|idx| Coord::new(idx % self.size, idx / self.size))
+            .collect())
     }
 
     pub fn size(&self) -> usize {
