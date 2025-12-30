@@ -9,6 +9,7 @@ pub type PlaceStoneResult = Result<Vec<Coord>, &'static str>; // TODO err type
 pub type BoardState = Array<Stone>;
 
 pub struct Board {
+    /// 棋盘的长宽 (长==宽)
     size: usize,
 
     /// 棋盘所有坐标位置的一维存储 ( 2D_board[y][x] == board[y*size+x] ), 以左上角为原点, 向下为+y, 向右为+x
@@ -89,10 +90,18 @@ impl Board {
         return engine;
     }
 
-    fn idx(&self, coord: Coord) -> Idx {
+    pub fn idx(&self, coord: Coord) -> Idx {
         debug_assert!(coord.y < self.size);
         debug_assert!(coord.x < self.size);
         return coord.y * self.size + coord.x;
+    }
+
+    pub fn coord(&self, idx: Idx) -> Coord {
+        debug_assert!(idx < self.size_2());
+        return Coord {
+            x: idx % self.size,
+            y: idx / self.size,
+        };
     }
 
     fn neighbors(&self, idx: Idx) -> Vec<Idx> {
@@ -166,7 +175,7 @@ impl Board {
         return v;
     }
 
-    fn have_stone(&self, idx: Idx) -> bool {
+    pub fn have_stone(&self, idx: Idx) -> bool {
         self.board[idx] != Stone::VOID
     }
 
@@ -369,12 +378,16 @@ impl Board {
         self.size
     }
 
+    pub fn size_2(&self) -> usize {
+        self.board.len()
+    }
+
     pub fn board(&self) -> &[Stone] {
         &self.board
     }
 
     pub fn board_string(&self) -> String {
-        let mut s = String::with_capacity(self.size * self.size * 2);
+        let mut s = String::with_capacity(self.size * (self.size + 1));
         let mut idx = 0;
         for _ in 0..self.size {
             for _ in 0..self.size {

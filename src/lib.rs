@@ -6,6 +6,7 @@
 )]
 pub mod board;
 pub mod common;
+pub mod engine;
 pub mod model;
 pub mod view;
 
