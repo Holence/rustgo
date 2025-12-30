@@ -1,4 +1,7 @@
-use rustgo::backend::{Board, BoardState, Coord, Stone};
+use rustgo::{
+    Coord, Stone,
+    board::{Board, BoardState},
+};
 
 const VOID: Stone = Stone::VOID;
 const BLACK: Stone = Stone::BLACK;

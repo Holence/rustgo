@@ -1,6 +1,7 @@
-use crate::backend::{Array, Idx};
 use std::collections::BTreeMap;
 use std::fmt::Debug;
+
+use crate::{Array, Idx};
 
 const NO_PARENT: usize = usize::MAX;
 

@@ -1,6 +1,6 @@
 use std::collections::{HashSet, VecDeque};
 
-use crate::backend::{Array, Coord, Idx, Stone, disjoint_set::DisjointSet};
+use crate::{Array, Coord, DisjointSet, Idx, Stone};
 
 const MAX_STATES_RECORD: usize = 30;
 

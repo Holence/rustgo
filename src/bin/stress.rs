@@ -1,5 +1,5 @@
 use rand::{Rng, rngs::ThreadRng};
-use rustgo::backend::{Coord, Board, Stone};
+use rustgo::{Coord, Stone, board::Board};
 
 fn random_number(rng: &mut ThreadRng, size: usize) -> usize {
     (rng.random::<u32>() % (size as u32)) as usize

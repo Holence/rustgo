@@ -1,4 +1,7 @@
-use crate::backend::{Board, Coord, PlaceStoneResult, Stone};
+use crate::{
+    Coord, Stone,
+    board::{Board, PlaceStoneResult},
+};
 
 pub struct Game {
     engine: Board,

@@ -4,6 +4,9 @@
     clippy::collapsible_if,
     clippy::collapsible_else_if
 )]
-pub mod backend;
+pub mod board;
+pub mod common;
 pub mod model;
 pub mod view;
+
+pub use common::*;
