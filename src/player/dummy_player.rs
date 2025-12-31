@@ -1,18 +1,18 @@
 use crate::{
     Coord, Stone,
     board::Board,
-    engine::{EngineTrait, MoveAction},
+    player::{MoveAction, PlayerTrait},
 };
 use rand::{Rng, rngs::ThreadRng};
 
-pub struct DummyEngine {
+pub struct DummyPlayer {
     pub board: Board,
     pub rng: ThreadRng,
 }
 
-impl DummyEngine {
+impl DummyPlayer {
     pub fn new(size: usize) -> Self {
-        DummyEngine {
+        DummyPlayer {
             board: Board::new(size),
             rng: rand::rng(),
         }
@@ -24,7 +24,7 @@ impl DummyEngine {
     }
 }
 
-impl EngineTrait for DummyEngine {
+impl PlayerTrait for DummyPlayer {
     fn play(&mut self, stone: Stone, coord: Coord) {
         self.board.place_stone(coord, stone).expect("should be ok");
     }

@@ -6,8 +6,8 @@
 )]
 pub mod board;
 pub mod common;
-pub mod engine;
 pub mod model;
+pub mod player;
 pub mod view;
 
 pub use common::*;

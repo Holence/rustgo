@@ -6,12 +6,14 @@ enum MoveAction {
     Resign,
 }
 
-trait EngineTrait {
-    // place `stone` at `coord`
+trait PlayerTrait {
+    /// others placed `stone` at `coord`
+    /// self should acknowledge this info
     fn play(&mut self, stone: Stone, coord: Coord);
 
     /// generate `MoveAction` for `stone`
+    /// it's self turn to move
     fn genmove(&mut self, stone: Stone) -> MoveAction;
 }
 
-mod dummy_engine;
+mod dummy_player;
