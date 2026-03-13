@@ -19,7 +19,7 @@ impl DummyPlayer {
     }
     pub fn random_coord(&mut self) -> Coord {
         // TODO random of usize???
-        let idx = (self.rng.random::<u32>() % (self.board.size_2() as u32)) as usize;
+        let idx = (self.rng.random::<u32>() % (self.board.size_square() as u32)) as usize;
         return self.board.coord(idx);
     }
 }

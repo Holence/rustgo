@@ -6,7 +6,7 @@
 )]
 pub mod board;
 pub mod common;
-pub mod model;
+pub mod game;
 pub mod player;
 pub mod view;
 

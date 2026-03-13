@@ -9,7 +9,7 @@ use cursive::{
     views::TextView,
 };
 
-use crate::{Coord, Stone, model::Game};
+use crate::{Coord, Stone, game::Game};
 
 pub struct BoardView {
     game: Game,

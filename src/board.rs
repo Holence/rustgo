@@ -97,7 +97,7 @@ impl Board {
     }
 
     pub fn coord(&self, idx: Idx) -> Coord {
-        debug_assert!(idx < self.size_2());
+        debug_assert!(idx < self.size_square());
         return Coord {
             x: idx % self.size,
             y: idx / self.size,
@@ -378,7 +378,7 @@ impl Board {
         self.size
     }
 
-    pub fn size_2(&self) -> usize {
+    pub fn size_square(&self) -> usize {
         self.board.len()
     }
 

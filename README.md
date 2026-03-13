@@ -24,6 +24,8 @@ Server
 
 # TODO
 
+- 不要全部用usize, usize不是固定的, 定义一个 type board_size = u32
 - GTP with gnugo
 - learn cfg
   - use feature Conditional compilation
+- TUI 用不同颜色的●表示多色棋
