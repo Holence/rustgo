@@ -12,15 +12,15 @@ fn main() -> io::Result<()> {
 
     let mut child = match child {
         Ok(child) => child,
-        Err(e) if e.kind() == io::ErrorKind::NotFound => {
-            eprintln!("Error: 'gnugo' executable not found.");
-            eprintln!("Please install GNU Go and ensure it is in your PATH.");
-            eprintln!("Example (Debian/Ubuntu): sudo apt install gnugo");
-            std::process::exit(1);
-        }
         Err(e) => {
-            eprintln!("Failed to start gnugo: {}", e);
-            std::process::exit(1);
+            if e.kind() == io::ErrorKind::NotFound {
+                eprintln!("Error: 'gnugo' executable not found.");
+                eprintln!("Please install GNU Go and ensure it is in your PATH.");
+                eprintln!("Example (Debian/Ubuntu): sudo apt install gnugo");
+            } else {
+                eprintln!("Failed to start gnugo: {}", e);
+            }
+            return io::Result::Err(e);
         }
     };
 
