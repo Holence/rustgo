@@ -15,10 +15,11 @@ impl Stone {
         LUT[self.0 as usize]
     }
 
-    pub fn next_stone(self, n_player: usize) -> Self {
+    /// 在`n`色棋的棋局中，计算出当前棋子的下一种棋子
+    pub fn next_stone(self, n: u8) -> Self {
         debug_assert!(self != Stone::VOID);
-        debug_assert!(n_player <= LUT.len());
-        if (self.0 as usize) < n_player {
+        debug_assert!(n <= LUT.len() as u8);
+        if (self.0) < n {
             return Stone(self.0 + 1);
         } else {
             return Stone::BLACK;

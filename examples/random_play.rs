@@ -5,7 +5,7 @@ fn random_number(rng: &mut ThreadRng, size: usize) -> usize {
     (rng.random::<u32>() % (size as u32)) as usize
 }
 
-const N_PLAYER: usize = 6;
+const N_PLAYER: u8 = 19;
 const BOARD_SIZE: usize = 42;
 
 fn main() {

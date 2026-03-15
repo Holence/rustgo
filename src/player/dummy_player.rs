@@ -1,13 +1,13 @@
 use crate::{
     Coord, Stone,
     board::Board,
-    player::{MoveAction, PlayerTrait},
+    player::{MoveAction, PlayerError, PlayerTrait},
 };
 use rand::{Rng, rngs::ThreadRng};
 
 pub struct DummyPlayer {
-    pub board: Board,
-    pub rng: ThreadRng,
+    board: Board,
+    rng: ThreadRng,
 }
 
 impl DummyPlayer {
@@ -25,23 +25,30 @@ impl DummyPlayer {
 }
 
 impl PlayerTrait for DummyPlayer {
-    fn play(&mut self, stone: Stone, coord: Coord) {
-        self.board.place_stone(coord, stone).expect("should be ok");
+    fn play(&mut self, move_action: MoveAction) -> Result<(), PlayerError> {
+        match move_action {
+            MoveAction::Move { stone, coord } => match self.board.place_stone(coord, stone) {
+                Ok(_) => return Ok(()),
+                Err(e) => {
+                    eprintln!("Try to place {stone} at {coord}, but board err: {e}");
+                    panic!()
+                }
+            },
+            MoveAction::Pass => todo!(),
+            MoveAction::Resign => todo!(),
+        }
     }
 
-    fn genmove(&mut self, stone: Stone) -> MoveAction {
+    fn genmove(&mut self, stone: Stone) -> Result<MoveAction, PlayerError> {
         // 随机生成坐标, 尝试几次
         for _ in 0..self.board.size() {
             let coord = self.random_coord();
             let result = self.board.place_stone(coord, stone);
-            match result {
-                // 如果成功
-                Ok(_) => return MoveAction::Move { stone, coord },
-                // 如果不成功, 则 continue
-                Err(_) => {}
+            if result.is_ok() {
+                return Ok(MoveAction::Move { stone, coord });
             }
         }
         // 如果都不成功, 则 PASS
-        return MoveAction::Pass;
+        return Ok(MoveAction::Pass);
     }
 }

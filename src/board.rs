@@ -243,6 +243,9 @@ impl Board {
 
     pub fn place_stone(&mut self, coord: Coord, stone: Stone) -> PlaceStoneResult {
         debug_assert!(stone != Stone::VOID);
+        if coord.x >= self.size || coord.y >= self.size {
+            return Err("非法坐标");
+        }
 
         #[cfg(debug_assertions)]
         self.verbose_check();

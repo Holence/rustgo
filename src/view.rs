@@ -35,9 +35,9 @@ const STAR: [(usize, usize); 9] = [
 ];
 
 impl BoardView {
-    pub fn new(size: usize, n_player: usize) -> Self {
+    pub fn new(size: usize, n_player: usize, n_stone: u8) -> Self {
         Self {
-            game: Game::new(size, n_player),
+            game: Game::new(size, n_player, n_stone),
         }
     }
 
