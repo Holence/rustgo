@@ -11,13 +11,13 @@ const BOARD_SIZE: usize = 42;
 fn main() {
     let mut rng = rand::rng(); // a local handle to the generator
 
-    let mut engine = Board::new(BOARD_SIZE);
+    let mut board = Board::new(BOARD_SIZE);
     let mut stone = Stone::BLACK;
     let mut moves: usize = 0;
     'outer: for _ in 0..1000000 {
         for _ in 0..20 {
             // 对于一种颜色，随机落子多次，如果都不成功，则结束对局
-            let res = engine.place_stone(
+            let res = board.place_stone(
                 Coord::new(
                     random_number(&mut rng, BOARD_SIZE),
                     random_number(&mut rng, BOARD_SIZE),
@@ -27,13 +27,13 @@ fn main() {
             if res.is_ok() {
                 stone = stone.next_stone(N_PLAYER);
                 println!("{:?}", res);
-                println!("{}", engine.board_string());
+                println!("{}", board.board_string());
                 moves += 1;
                 continue 'outer;
             }
         }
         break 'outer;
     }
-    println!("{}", engine.board_string());
+    println!("{}", board.board_string());
     println!("moves: {}", moves);
 }

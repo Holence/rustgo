@@ -6,16 +6,16 @@ const MAX_STATES_RECORD: usize = 30;
 
 pub type PlaceStoneResult = Result<Vec<Coord>, &'static str>; // TODO err type
 
-pub type BoardState = Array<Stone>;
+pub type BoardArray = Array<Stone>;
 
 pub struct Board {
     /// 棋盘的长宽 (长==宽)
     size: usize,
 
-    /// 棋盘所有坐标位置的一维存储 ( 2D_board[y][x] == board[y*size+x] ), 以左上角为原点, 向下为+y, 向右为+x
+    /// 棋盘所有坐标位置的一维存储 ( 2D_board[y][x] == b_array[y*size+x] ), 以左上角为原点, 向下为+y, 向右为+x
     ///
-    /// board.len() == size * size
-    board: BoardState,
+    /// b_array.len() == size * size
+    b_array: BoardArray,
 
     /// 棋子的分组信息
     ///
@@ -37,57 +37,57 @@ pub struct Board {
     /// 不需要记录全部的历史状态, 只需要记录最新的 ? 条即可 (TODO N劫循环的循环周期为多少)
     ///
     /// 新记录 push_front, 超出的 pop_back
-    history_board_states: VecDeque<BoardState>, // TODO fixed size deque
+    history_b_array: VecDeque<BoardArray>, // TODO fixed size deque
 }
 
 impl Board {
     pub fn new(size: usize) -> Self {
         Board {
             size: size,
-            board: vec![Stone::VOID; size * size].into_boxed_slice(),
+            b_array: vec![Stone::VOID; size * size].into_boxed_slice(),
             group_ds: DisjointSet::new(size * size),
             group_qi: vec![0; size * size].into_boxed_slice(),
-            history_board_states: VecDeque::with_capacity(MAX_STATES_RECORD),
+            history_b_array: VecDeque::with_capacity(MAX_STATES_RECORD),
         }
     }
 
-    pub fn new_with_board(size: usize, board: BoardState) -> Self {
-        debug_assert!(size * size == board.len());
-        let mut engine = Board {
+    pub fn new_with_board(size: usize, b_array: BoardArray) -> Self {
+        debug_assert!(size * size == b_array.len());
+        let mut board = Board {
             size,
-            board,
+            b_array,
             group_ds: DisjointSet::new(size * size),
             group_qi: vec![0; size * size].into_boxed_slice(),
-            history_board_states: VecDeque::with_capacity(MAX_STATES_RECORD),
+            history_b_array: VecDeque::with_capacity(MAX_STATES_RECORD),
         };
 
         // 对于每个坐标的棋子，向右向下与同色棋子连接
-        for cur_idx in 0..engine.board.len() {
-            let cur_stone = engine.board[cur_idx];
+        for cur_idx in 0..board.b_array.len() {
+            let cur_stone = board.b_array[cur_idx];
 
             if cur_stone != Stone::VOID {
-                engine.group_ds.insert(cur_idx);
+                board.group_ds.insert(cur_idx);
 
-                if let Some(neighbor_idx) = engine.right_neighbor(cur_idx) {
-                    if engine.board[neighbor_idx] == cur_stone {
-                        engine.group_ds.connect(cur_idx, neighbor_idx);
+                if let Some(neighbor_idx) = board.right_neighbor(cur_idx) {
+                    if board.b_array[neighbor_idx] == cur_stone {
+                        board.group_ds.connect(cur_idx, neighbor_idx);
                     }
                 }
-                if let Some(neighbor_idx) = engine.down_neighbor(cur_idx) {
-                    if engine.board[neighbor_idx] == cur_stone {
-                        engine.group_ds.connect(cur_idx, neighbor_idx);
+                if let Some(neighbor_idx) = board.down_neighbor(cur_idx) {
+                    if board.b_array[neighbor_idx] == cur_stone {
+                        board.group_ds.connect(cur_idx, neighbor_idx);
                     }
                 }
             }
         }
 
         // 对于所有组，计算 group_qi
-        for root_idx in engine.group_ds.group_roots() {
-            let members = engine.group_ds.group_members(root_idx).unwrap().clone();
-            engine.group_qi[root_idx] = engine.calc_qi(&members);
+        for root_idx in board.group_ds.group_roots() {
+            let members = board.group_ds.group_members(root_idx).unwrap().clone();
+            board.group_qi[root_idx] = board.calc_qi(&members);
         }
 
-        return engine;
+        return board;
     }
 
     pub fn idx(&self, coord: Coord) -> Idx {
@@ -176,14 +176,14 @@ impl Board {
     }
 
     pub fn have_stone(&self, idx: Idx) -> bool {
-        self.board[idx] != Stone::VOID
+        self.b_array[idx] != Stone::VOID
     }
 
     /// 计算同色棋子组
     ///
     /// 除了测试，应该没有地方需要使用这个函数，因为 self.group_ds 里已经在 connect 的过程中动态更新 group_members 了
     fn allies(&self, idx: Idx) -> Vec<Idx> {
-        let cur_stone = self.board[idx];
+        let cur_stone = self.b_array[idx];
         assert!(cur_stone != Stone::VOID);
 
         let mut allies_set: HashSet<Idx> = HashSet::new();
@@ -194,7 +194,7 @@ impl Board {
         while !wait_to_visit.is_empty() {
             let cur_idx = wait_to_visit.pop_front().unwrap();
             for neighbor_idx in self.neighbors(cur_idx) {
-                if self.have_stone(neighbor_idx) && self.board[neighbor_idx] == cur_stone {
+                if self.have_stone(neighbor_idx) && self.b_array[neighbor_idx] == cur_stone {
                     if !allies_set.contains(&neighbor_idx) {
                         allies_set.insert(neighbor_idx);
                         wait_to_visit.push_back(neighbor_idx);
@@ -220,7 +220,7 @@ impl Board {
 
     #[cfg(debug_assertions)]
     fn verbose_check(&self) {
-        for idx in 0..self.board.len() {
+        for idx in 0..self.b_array.len() {
             if self.have_stone(idx) {
                 let mut tmp = self.group_ds.clone();
                 let root_idx = tmp.find_root(idx).unwrap();
@@ -251,7 +251,7 @@ impl Board {
         self.verbose_check();
 
         let cur_idx = self.idx(coord);
-        debug_assert!(cur_idx < self.board.len());
+        debug_assert!(cur_idx < self.b_array.len());
 
         // 1. 禁止下到已有的棋子上
         if self.have_stone(cur_idx) {
@@ -267,7 +267,7 @@ impl Board {
         let mut opponent_groups: Vec<Idx> = Vec::with_capacity(4); // "非己方组" (不包含"提子组")
         let mut eaten_groups: Vec<Idx> = Vec::with_capacity(4); // "提子组"
         for neighbor_idx in self.neighbors(cur_idx) {
-            let neighbor_stone = self.board[neighbor_idx];
+            let neighbor_stone = self.b_array[neighbor_idx];
             if neighbor_stone == Stone::VOID {
                 cur_qi += 1;
             } else {
@@ -305,21 +305,21 @@ impl Board {
 
         // 5. 禁止全局同形: "棋盘经过落子+提子的变化" 与 list[历史记录] 比较, 不可以相同
         // TODO 存储压缩
-        let mut new_board = self.board.clone();
-        new_board[cur_idx] = stone;
+        let mut new_b_array = self.b_array.clone();
+        new_b_array[cur_idx] = stone;
         for &root_idx in &eaten_groups {
             for &idx in self.group_ds.group_members(root_idx).unwrap() {
-                new_board[idx] = Stone::VOID;
+                new_b_array[idx] = Stone::VOID;
             }
         }
-        for board in &self.history_board_states {
-            if *board == new_board {
+        for b_array in &self.history_b_array {
+            if *b_array == new_b_array {
                 return Err("禁止全局同形");
             }
         }
 
         // 6. 之后便允许落子
-        self.board[cur_idx] = stone;
+        self.b_array[cur_idx] = stone;
 
         // 6.1 如果有"己方组", 则将落子与"己方组"merge, group root可能会更新, 在group root中更新"气"和members
         //     (此时气可能为0, 要等到提子后才还会被接着更新)
@@ -357,7 +357,7 @@ impl Board {
             eaten_stones.append(&mut self.group_ds.delete_group(root_idx));
         }
         for &idx in &eaten_stones {
-            self.board[idx] = Stone::VOID;
+            self.b_array[idx] = Stone::VOID;
         }
         for &idx in &eaten_stones {
             for root_idx in self.neighbor_groups(idx) {
@@ -365,11 +365,11 @@ impl Board {
             }
         }
 
-        debug_assert!(new_board == self.board);
-        if self.history_board_states.len() == MAX_STATES_RECORD {
-            self.history_board_states.pop_back();
+        debug_assert!(new_b_array == self.b_array);
+        if self.history_b_array.len() == MAX_STATES_RECORD {
+            self.history_b_array.pop_back();
         }
-        self.history_board_states.push_front(new_board);
+        self.history_b_array.push_front(new_b_array);
 
         Ok(eaten_stones
             .iter()
@@ -382,11 +382,11 @@ impl Board {
     }
 
     pub fn size_square(&self) -> usize {
-        self.board.len()
+        self.b_array.len()
     }
 
-    pub fn board(&self) -> &[Stone] {
-        &self.board
+    pub fn board_array(&self) -> &[Stone] {
+        &self.b_array
     }
 
     pub fn board_string(&self) -> String {
@@ -394,7 +394,7 @@ impl Board {
         let mut idx = 0;
         for _ in 0..self.size {
             for _ in 0..self.size {
-                let ch = self.board[idx].as_char();
+                let ch = self.b_array[idx].as_char();
                 s.push(ch);
                 idx += 1;
             }

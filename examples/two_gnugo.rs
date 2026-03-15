@@ -7,7 +7,7 @@ use rustgo::{
 const BOARD_SIZE: usize = 19;
 
 fn main() {
-    let mut engine = Board::new(BOARD_SIZE);
+    let mut board = Board::new(BOARD_SIZE);
     let mut player1 = LocalGnugoPlayer::new(BOARD_SIZE).unwrap();
     let mut player2 = LocalGnugoPlayer::new(BOARD_SIZE).unwrap();
 
@@ -17,7 +17,7 @@ fn main() {
             let move_action = player1.genmove(stone).unwrap();
             match move_action {
                 MoveAction::Move { stone, coord } => {
-                    engine.place_stone(coord, stone).unwrap();
+                    board.place_stone(coord, stone).unwrap();
                 }
                 MoveAction::Pass => todo!(),
                 MoveAction::Resign => todo!(),
@@ -27,7 +27,7 @@ fn main() {
             let move_action = player2.genmove(stone).unwrap();
             match move_action {
                 MoveAction::Move { stone, coord } => {
-                    engine.place_stone(coord, stone).unwrap();
+                    board.place_stone(coord, stone).unwrap();
                 }
                 MoveAction::Pass => todo!(),
                 MoveAction::Resign => todo!(),
@@ -35,6 +35,6 @@ fn main() {
             player1.play(move_action).unwrap();
         }
         stone = stone.next_stone(2);
-        println!("{}", engine.board_string());
+        println!("{}", board.board_string());
     }
 }

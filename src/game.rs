@@ -4,7 +4,7 @@ use crate::{
 };
 
 pub struct Game {
-    engine: Board,
+    board: Board,
     n_player: usize,
     n_stone: u8,
     cur_stone: Stone,
@@ -15,7 +15,7 @@ impl Game {
         // TODO 传入 Vec<Box<dyn PlayerTrait>>, 每次落子时 player.genmove
         // TODO player附带阵营的信息, n_stone = 阵营数
         Self {
-            engine: Board::new(size),
+            board: Board::new(size),
             n_player: n_player,
             n_stone: n_stone,
             cur_stone: Stone::BLACK,
@@ -23,15 +23,15 @@ impl Game {
     }
 
     pub fn size(&self) -> usize {
-        self.engine.size()
+        self.board.size()
     }
 
     pub fn board(&self) -> &[Stone] {
-        self.engine.board()
+        self.board.board_array()
     }
 
     pub fn place_stone(&mut self, coord: Coord) -> PlaceStoneResult {
-        let ret = self.engine.place_stone(coord, self.cur_stone)?;
+        let ret = self.board.place_stone(coord, self.cur_stone)?;
         self.cur_stone = self.cur_stone.next_stone(self.n_stone);
         Ok(ret)
     }
