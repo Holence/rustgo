@@ -24,7 +24,10 @@ Server
 
 # TODO
 
-- 不要全部用usize, usize不是固定的, 定义一个 type board_size = u32, type stone_nums, type player_nums
+- 不要全部用usize, usize不是固定的, 定义
+  - 抽离disjoint_set，固定其Idx类型
+  - board中的idx直接用usize，方便计算
+  - type stone_nums
 - GTP with gnugo
 - learn cfg
   - use feature Conditional compilation
