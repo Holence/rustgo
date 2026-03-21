@@ -1,11 +1,12 @@
 use std::collections::{HashSet, VecDeque};
 
-use crate::{Array, Coord, DisjointSet, Idx, Stone};
+use crate::{Array, Coord, DisjointSet, Stone};
 
 const MAX_STATES_RECORD: usize = 30;
 
-pub type PlaceStoneResult = Result<Vec<Coord>, &'static str>; // TODO err type
+type Idx = usize;
 
+pub type PlaceStoneResult = Result<Vec<Coord>, &'static str>; // TODO err type
 pub type BoardArray = Array<Stone>;
 
 pub struct Board {
@@ -22,7 +23,7 @@ pub struct Board {
     /// 同色、连续的棋子在运行时使用 disjoint set 记录分组
     ///
     /// group root 所对应的下标 idx 在 self.group_qi[idx] 中会记录"气"
-    group_ds: DisjointSet,
+    group_ds: DisjointSet<u16>,
 
     /// 棋子组的气
     ///

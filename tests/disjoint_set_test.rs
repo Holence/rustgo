@@ -2,11 +2,12 @@
 
 use rustgo::DisjointSet;
 
-const TEST_SIZE: usize = 15;
+type TestType = u8;
+const TEST_SIZE: usize = (TestType::MAX / 2 - 1) as usize;
 
 #[test]
 fn test_empty() {
-    let mut ds = DisjointSet::new(TEST_SIZE);
+    let mut ds = DisjointSet::<TestType>::new(TEST_SIZE);
     for i in 0..ds.capacity() {
         assert_eq!(ds.contains(i), false);
         assert_eq!(ds.find_root(i), None);
@@ -26,7 +27,7 @@ fn test_empty() {
 
 #[test]
 fn test_insert() {
-    let mut ds = DisjointSet::new(TEST_SIZE);
+    let mut ds = DisjointSet::<TestType>::new(TEST_SIZE);
     let half = ds.capacity() / 2;
     for i in 0..half {
         ds.insert(i);
@@ -59,7 +60,7 @@ fn test_insert() {
 
 #[test]
 fn test_connect() {
-    let mut ds = DisjointSet::new(TEST_SIZE);
+    let mut ds = DisjointSet::<TestType>::new(TEST_SIZE);
     let half = ds.capacity() / 2;
     for i in 0..half {
         ds.connect(i, i + half);
@@ -87,7 +88,7 @@ fn test_connect() {
 
 #[test]
 fn test_delete() {
-    let mut ds = DisjointSet::new(TEST_SIZE);
+    let mut ds = DisjointSet::<TestType>::new(TEST_SIZE);
     let half = ds.capacity() / 2;
     for i in 0..half {
         ds.connect(i, i + half);
