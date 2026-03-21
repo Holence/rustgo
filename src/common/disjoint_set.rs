@@ -3,15 +3,12 @@ use std::fmt::Debug;
 
 use crate::{Array, Idx};
 
-const NO_PARENT: usize = usize::MAX;
-
 #[derive(Clone)]
 pub struct DisjointSet {
     /// 所属父级信息
-    /// 非根节点: 存储父级下标
-    /// 根节点: 存储 NO_PARENT
-    /// 由于 NO_PARENT 选用了 usize 的上限值, 所以上限
-    parent_idx: Array<Idx>,
+    /// 非根节点: 父级下标
+    /// 根节点: None
+    parent_idx: Array<Option<Idx>>,
 
     /// 组成员
     /// 非根节点: None
@@ -26,7 +23,7 @@ impl DisjointSet {
         // TODO 大部分情况 都有 capacity <= u16::MAX, 可以不用 usize 存
         assert!(capacity < usize::MAX);
         DisjointSet {
-            parent_idx: vec![NO_PARENT; capacity].into_boxed_slice(),
+            parent_idx: vec![None; capacity].into_boxed_slice(),
             group_members: vec![None; capacity].into_boxed_slice(),
         }
     }
@@ -50,18 +47,18 @@ impl DisjointSet {
     /// 如果不存在 group, 则返回 None
     pub fn find_root(&mut self, idx: Idx) -> Option<Idx> {
         let parent_idx = self.parent_idx[idx];
-        if parent_idx == NO_PARENT {
+        if let Some(parent_idx) = parent_idx {
+            let root = self.find_root(parent_idx);
+            if let Some(root_idx) = root {
+                self.parent_idx[idx] = Some(root_idx); // 路径压缩
+            }
+            return root;
+        } else {
             if self.group_members[idx].is_none() {
                 return None;
             } else {
                 return Some(idx);
             }
-        } else {
-            let root = self.find_root(parent_idx);
-            if let Some(root_idx) = root {
-                self.parent_idx[idx] = root_idx; // 路径压缩
-            }
-            return root;
         }
     }
 
@@ -95,7 +92,7 @@ impl DisjointSet {
     /// 返回所有的 group root
     ///
     /// 时间复杂度 O(N)
-    pub fn group_roots(&mut self) -> Vec<Idx> {
+    pub fn group_roots(&self) -> Vec<Idx> {
         let mut roots: Vec<Idx> = vec![];
         for idx in 0..self.capacity() {
             if self.group_members[idx].is_some() {
@@ -120,7 +117,7 @@ impl DisjointSet {
         let mut members = self.group_members[root_idx].take().unwrap(); // take out, leave as None
         for &idx in &members {
             // 恢复初始值
-            self.parent_idx[idx] = NO_PARENT;
+            self.parent_idx[idx] = None;
         }
         members.sort_unstable(); // 排序不放在 connect 里, 因为 connect 调用的更频繁
         return members;
@@ -149,7 +146,7 @@ impl DisjointSet {
 
     /// 是否存在元素
     pub fn contains(&self, idx: Idx) -> bool {
-        self.parent_idx[idx] != NO_PARENT || self.group_members[idx].is_some()
+        self.parent_idx[idx].is_some() || self.group_members[idx].is_some()
     }
 
     pub fn connect(&mut self, idx_a: Idx, idx_b: Idx) {
@@ -167,7 +164,7 @@ impl DisjointSet {
                 .unwrap()
                 .append(&mut members_a);
 
-            self.parent_idx[root_a] = root_b;
+            self.parent_idx[root_a] = Some(root_b);
         }
     }
 }
