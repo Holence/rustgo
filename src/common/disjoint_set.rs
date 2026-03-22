@@ -140,17 +140,11 @@ impl<T: IdxTrait> DisjointSet<T> {
         return roots;
     }
 
-    /// 删除 idx 所属 group 的所有 members, 并返回该 group 的 members (保证升序)
+    /// 删除 idx 所属 group 的所有 members, 并返回该 group 的 Some(members) (保证升序)
     ///
-    /// # Panic
-    ///
-    /// 如果不存在 group, 则 Panic
-    pub fn delete_group(&mut self, idx: usize) -> Vec<usize> {
-        let root = self.find_root(idx);
-        if root.is_none() {
-            panic!("idx should belong to a group!");
-        }
-        let root_idx = root.unwrap();
+    /// 如果不存在 group, 则 None
+    pub fn delete_group(&mut self, idx: usize) -> Option<Vec<usize>> {
+        let root_idx = self.find_root(idx)?;
 
         let mut members = self.group_members[root_idx].take().unwrap(); // take out, leave as None
         for &idx in &members {
@@ -158,7 +152,7 @@ impl<T: IdxTrait> DisjointSet<T> {
             self.parent_idx[idx] = None;
         }
         members.sort_unstable(); // 排序不放在 connect 里, 因为 connect 调用的更频繁
-        return members;
+        return Some(members);
     }
 
     pub fn is_connected(&mut self, idx_a: usize, idx_b: usize) -> bool {

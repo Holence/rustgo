@@ -95,7 +95,7 @@ fn test_delete() {
     }
 
     for i in half..half * 2 {
-        assert_eq!(ds.delete_group(i), vec![i - half, i]);
+        assert_eq!(ds.delete_group(i).unwrap(), vec![i - half, i]);
     }
 
     for i in 0..ds.capacity() {

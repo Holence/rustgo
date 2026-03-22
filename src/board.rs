@@ -355,7 +355,7 @@ impl Board {
         for root_idx in eaten_groups {
             self.group_qi[root_idx] = 0;
 
-            eaten_stones.append(&mut self.group_ds.delete_group(root_idx));
+            eaten_stones.append(&mut self.group_ds.delete_group(root_idx).unwrap());
         }
         for &idx in &eaten_stones {
             self.b_array[idx] = Stone::VOID;
