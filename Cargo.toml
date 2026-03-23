@@ -9,6 +9,7 @@ rand = "0.9.2"
 
 [dev-dependencies]
 criterion = "0.8.2"
+rand = "0.9.2"
 
 [[bench]]
 name = "disjoint_set_bench"

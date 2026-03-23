@@ -4,7 +4,7 @@ use std::fmt::Debug;
 use crate::Array;
 
 /// Trait for compact index storage
-trait IdxTrait: Copy + Eq + Debug {
+pub trait IdxTrait: Copy + Eq + Debug {
     fn from_usize(x: usize) -> Self;
     fn to_usize(self) -> usize;
     fn max_value() -> usize;
