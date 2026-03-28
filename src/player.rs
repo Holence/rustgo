@@ -12,6 +12,7 @@ impl From<std::io::Error> for PlayerError {
     }
 }
 
+#[derive(Clone, Copy)]
 pub enum MoveAction {
     Move { stone: Stone, coord: Coord },
     Pass,

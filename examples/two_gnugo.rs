@@ -4,7 +4,7 @@ use rustgo::{
     player::{MoveAction, PlayerTrait, local_gnugo_player::LocalGnugoPlayer},
 };
 
-const BOARD_SIZE: usize = 19;
+const BOARD_SIZE: usize = 9;
 
 fn main() {
     let mut board = Board::new(BOARD_SIZE);
