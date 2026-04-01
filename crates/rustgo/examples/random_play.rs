@@ -1,4 +1,4 @@
-use rand::{Rng, rngs::ThreadRng};
+use rand::{RngExt, rngs::ThreadRng};
 use rustgo::{Coord, Stone, board::Board};
 
 fn random_number(rng: &mut ThreadRng, size: usize) -> usize {

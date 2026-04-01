@@ -1,4 +1,5 @@
 use criterion::{Criterion, criterion_group, criterion_main};
+use rand::RngExt;
 use rustgo::DisjointSet;
 use rustgo::IdxTrait;
 use std::hint::black_box;
@@ -10,8 +11,8 @@ enum Op {
     DeleteGroup(usize),
 }
 
+use rand::SeedableRng;
 use rand::rngs::StdRng;
-use rand::{Rng, SeedableRng};
 
 fn generate_ops(n: usize, seed: u64) -> Vec<Op> {
     let mut rng = StdRng::seed_from_u64(seed);

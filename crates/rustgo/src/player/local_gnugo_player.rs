@@ -1,6 +1,6 @@
 use std::{
-    io::{self, BufRead, BufReader, BufWriter, Read, Write},
-    process::{Child, ChildStdin, ChildStdout, Command, ExitStatus, Stdio},
+    io::{self, BufRead, BufReader, Write},
+    process::{Child, ChildStdin, ChildStdout, Command, Stdio},
 };
 
 use crate::{

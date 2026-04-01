@@ -9,7 +9,4 @@ pub mod common;
 pub mod game;
 pub mod player;
 
-#[cfg(feature = "broken")]
-pub mod view;
-
 pub use common::*;

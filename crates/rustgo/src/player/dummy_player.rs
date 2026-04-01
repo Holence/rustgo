@@ -3,7 +3,7 @@ use crate::{
     board::Board,
     player::{MoveAction, PlayerError, PlayerTrait},
 };
-use rand::{Rng, rngs::ThreadRng};
+use rand::{RngExt, rngs::ThreadRng};
 
 pub struct DummyPlayer {
     board: Board,
