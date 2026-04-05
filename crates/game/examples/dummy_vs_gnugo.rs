@@ -1,8 +1,8 @@
-use rustgo::{
-    Stone,
+use game::{
     game::{Game, Team},
     player::{dummy_player::DummyPlayer, local_gnugo_player::LocalGnugoPlayer},
 };
+use rustgo::Stone;
 
 const BOARD_SIZE: usize = 13;
 fn main() {

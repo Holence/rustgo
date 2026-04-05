@@ -1,11 +1,8 @@
 use std::{thread::sleep, time::Duration};
 
-use crate::{
-    Coord, Stone,
-    board::Board,
-    player::{MoveAction, PlayerError, PlayerTrait},
-};
+use crate::player::{MoveAction, PlayerError, PlayerTrait};
 use rand::{RngExt, rngs::ThreadRng};
+use rustgo::{Coord, Stone, board::Board};
 
 pub struct DummyPlayer {
     board: Board,

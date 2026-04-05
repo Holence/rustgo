@@ -1,8 +1,5 @@
-use rustgo::{
-    Stone,
-    board::Board,
-    player::{MoveAction, PlayerTrait, local_gnugo_player::LocalGnugoPlayer},
-};
+use game::player::{MoveAction, PlayerTrait, local_gnugo_player::LocalGnugoPlayer};
+use rustgo::{Stone, board::Board};
 
 const BOARD_SIZE: usize = 9;
 

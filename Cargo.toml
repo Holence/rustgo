@@ -3,6 +3,7 @@ resolver = "3"
 members = [
     "crates/rustgo",
     "crates/gui",
+    "crates/game",
 ]
 
 [profile.release]

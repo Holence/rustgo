@@ -4,15 +4,14 @@ use std::{
 };
 
 use eframe::egui::{self, Color32, Vec2};
-use rustgo::{
-    Coord, Stone,
-    board::Board,
+use game::{
     game::{Game, Team},
     player::{
         GameMessage, MoveAction, channel_player::ChannelPlayer, dummy_player::DummyPlayer,
         local_gnugo_player::LocalGnugoPlayer,
     },
 };
+use rustgo::{Coord, Stone, board::Board};
 
 struct UiBoard {
     board: Board,

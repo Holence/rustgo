@@ -1,4 +1,4 @@
-use crate::{Coord, Stone};
+use rustgo::{Coord, Stone};
 
 #[derive(Debug)]
 pub enum PlayerError {

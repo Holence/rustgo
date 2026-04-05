@@ -1,17 +1,11 @@
 [package]
-name = "rustgo"
+name = "game"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-
-[dev-dependencies]
-criterion = "0.8.2"
 rand = "0.10.0"
-
-[[bench]]
-name = "disjoint_set_bench"
-harness = false
+rustgo = { path = "../rustgo" }
 
 [lints.rust]
 unused_must_use = "deny"

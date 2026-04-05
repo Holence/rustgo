@@ -6,7 +6,5 @@
 )]
 pub mod board;
 pub mod common;
-pub mod game;
-pub mod player;
 
 pub use common::*;

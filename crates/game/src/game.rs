@@ -1,8 +1,6 @@
-use crate::{
-    Stone,
-    board::Board,
-    player::{MoveAction, PlayerError, PlayerTrait},
-};
+use rustgo::{Stone, board::Board};
+
+use crate::player::{MoveAction, PlayerError, PlayerTrait};
 
 pub struct Team {
     stone: Stone,
@@ -11,10 +9,7 @@ pub struct Team {
 
 impl Team {
     pub fn new(stone: Stone, players: Vec<Box<dyn PlayerTrait>>) -> Self {
-        Self {
-            stone: stone,
-            players,
-        }
+        Self { stone, players }
     }
 
     pub fn play(

@@ -1,9 +1,8 @@
 use std::sync::mpsc::{Receiver, Sender};
 
-use crate::{
-    Stone,
-    player::{GameMessage, MoveAction, PlayerError, PlayerTrait},
-};
+use rustgo::Stone;
+
+use crate::player::{GameMessage, MoveAction, PlayerError, PlayerTrait};
 
 // 用队列连接的Player，仅用于对接GUI前端
 pub struct ChannelPlayer {

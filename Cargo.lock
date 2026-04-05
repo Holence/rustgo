@@ -932,6 +932,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "game"
+version = "0.1.0"
+dependencies = [
+ "rand",
+ "rustgo",
+]
+
+[[package]]
 name = "gethostname"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1060,6 +1068,7 @@ name = "gui"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "game",
  "rustgo",
 ]
 

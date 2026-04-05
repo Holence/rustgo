@@ -3,10 +3,9 @@ use std::{
     process::{Child, ChildStdin, ChildStdout, Command, Stdio},
 };
 
-use crate::{
-    Coord, Stone,
-    player::{MoveAction, PlayerError, PlayerTrait},
-};
+use rustgo::{Coord, Stone};
+
+use crate::player::{MoveAction, PlayerError, PlayerTrait};
 
 pub struct LocalGnugoPlayer {
     size: usize,
