@@ -69,15 +69,15 @@ impl Board {
             if cur_stone != Stone::VOID {
                 board.group_ds.insert(cur_idx);
 
-                if let Some(neighbor_idx) = board.right_neighbor(cur_idx) {
-                    if board.b_array[neighbor_idx] == cur_stone {
-                        board.group_ds.connect(cur_idx, neighbor_idx);
-                    }
+                if let Some(neighbor_idx) = board.right_neighbor(cur_idx)
+                    && board.b_array[neighbor_idx] == cur_stone
+                {
+                    board.group_ds.connect(cur_idx, neighbor_idx);
                 }
-                if let Some(neighbor_idx) = board.down_neighbor(cur_idx) {
-                    if board.b_array[neighbor_idx] == cur_stone {
-                        board.group_ds.connect(cur_idx, neighbor_idx);
-                    }
+                if let Some(neighbor_idx) = board.down_neighbor(cur_idx)
+                    && board.b_array[neighbor_idx] == cur_stone
+                {
+                    board.group_ds.connect(cur_idx, neighbor_idx);
                 }
             }
         }
@@ -195,11 +195,12 @@ impl Board {
         while !wait_to_visit.is_empty() {
             let cur_idx = wait_to_visit.pop_front().unwrap();
             for neighbor_idx in self.neighbors(cur_idx) {
-                if self.have_stone(neighbor_idx) && self.b_array[neighbor_idx] == cur_stone {
-                    if !allies_set.contains(&neighbor_idx) {
-                        allies_set.insert(neighbor_idx);
-                        wait_to_visit.push_back(neighbor_idx);
-                    }
+                if self.have_stone(neighbor_idx)
+                    && self.b_array[neighbor_idx] == cur_stone
+                    && !allies_set.contains(&neighbor_idx)
+                {
+                    allies_set.insert(neighbor_idx);
+                    wait_to_visit.push_back(neighbor_idx);
                 }
             }
         }
@@ -289,18 +290,16 @@ impl Board {
         }
 
         // 4. 禁止使己方气尽: 如果没有"提子组", 且`cur_qi==0`且所有"己方组"的"气"都是1, 则判定为自杀
-        if eaten_groups.is_empty() {
-            if cur_qi == 0 {
-                let mut flag = false;
-                for &root_idx in &ally_groups {
-                    if self.group_qi[root_idx] != 1 {
-                        flag = true;
-                        break;
-                    }
+        if eaten_groups.is_empty() && cur_qi == 0 {
+            let mut flag = false;
+            for &root_idx in &ally_groups {
+                if self.group_qi[root_idx] != 1 {
+                    flag = true;
+                    break;
                 }
-                if !flag {
-                    return Err("禁止使己方气尽");
-                }
+            }
+            if !flag {
+                return Err("禁止使己方气尽");
             }
         }
 

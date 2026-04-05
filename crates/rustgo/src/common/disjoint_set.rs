@@ -68,7 +68,7 @@ impl<T: IdxTrait> DisjointSet<T> {
 
     /// 最大能承载多少元素
     pub fn capacity(&self) -> usize {
-        return self.parent_idx.len();
+        self.parent_idx.len()
     }
 
     /// 已经存储了多少元素

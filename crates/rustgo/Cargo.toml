@@ -15,3 +15,8 @@ harness = false
 
 [lints.rust]
 unused_must_use = "deny"
+
+[lints.clippy]
+needless_return = "allow"
+redundant_field_names = "allow"
+collapsible_else_if = "allow"
