@@ -16,7 +16,8 @@ fn test_init() {
 #[test]
 fn test_1() {
     let mut board = Board::new(3);
-    let _ = board.place_stone(Coord::new(1, 1), BLACK);
+    let result = board.place_stone(Coord::new(1, 1), BLACK);
+    assert!(result.is_ok());
     assert_eq!(
         board.board_string(),
         "\

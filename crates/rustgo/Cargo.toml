@@ -12,3 +12,6 @@ criterion = "0.8.2"
 [[bench]]
 name = "disjoint_set_bench"
 harness = false
+
+[lints.rust]
+unused_must_use = "deny"
