@@ -10,9 +10,18 @@ impl Stone {
     pub const BLACK: Stone = Stone(1);
     pub const WHITE: Stone = Stone(2);
 
+    pub fn new(x: u8) -> Self {
+        Stone(x)
+    }
+
     #[inline]
     pub fn as_char(&self) -> char {
         LUT[self.0 as usize]
+    }
+
+    #[inline]
+    pub fn as_usize(&self) -> usize {
+        self.0 as usize
     }
 
     /// 在`n`色棋的棋局中，计算出当前棋子的下一种棋子

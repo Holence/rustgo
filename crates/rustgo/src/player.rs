@@ -19,6 +19,12 @@ pub enum MoveAction {
     Resign,
 }
 
+pub enum GameMessage {
+    MoveAction(MoveAction),
+    GenMove(Stone),
+    GameOver,
+}
+
 pub trait PlayerTrait {
     /// others placed `stone` at `coord`
     /// self should acknowledge this info
@@ -27,7 +33,12 @@ pub trait PlayerTrait {
     /// generate `MoveAction` for `stone`
     /// it's self turn to move
     fn genmove(&mut self, stone: Stone) -> Result<MoveAction, PlayerError>;
+
+    // TODO notify current player
+    // TODO notify GameOverInfo
+    // 因为多色棋、联棋的对局结束得由Game来决定, 每个Player是不知道是否可以结束的
 }
 
+pub mod channel_player;
 pub mod dummy_player;
 pub mod local_gnugo_player;

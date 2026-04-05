@@ -1,3 +1,5 @@
+use std::{thread::sleep, time::Duration};
+
 use crate::{
     Coord, Stone,
     board::Board,
@@ -41,6 +43,7 @@ impl PlayerTrait for DummyPlayer {
 
     fn genmove(&mut self, stone: Stone) -> Result<MoveAction, PlayerError> {
         // 随机生成坐标, 尝试几次
+        sleep(Duration::from_micros(500));
         for _ in 0..self.board.size() {
             let coord = self.random_coord();
             let result = self.board.place_stone(coord, stone);

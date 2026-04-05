@@ -1,57 +1,92 @@
-#[derive(Clone, Copy, PartialEq)]
-enum Stone {
-    Black,
-    White,
+use std::{
+    sync::mpsc::{self, Receiver, Sender},
+    thread,
+};
+
+use eframe::egui::{self, Color32, Vec2};
+use rustgo::{
+    Coord, Stone,
+    board::Board,
+    game::{Game, Team},
+    player::{
+        GameMessage, MoveAction, channel_player::ChannelPlayer, dummy_player::DummyPlayer,
+        local_gnugo_player::LocalGnugoPlayer,
+    },
+};
+
+struct UiBoard {
+    board: Board,
+    pending_move: Option<Stone>,
+    tx: Sender<MoveAction>,    // 点击事件，发出信息
+    rx: Receiver<GameMessage>, // 接收信息，更新棋盘
 }
 
-struct GoBoard {
-    size: usize, // 19
-    grid: Vec<Option<Stone>>,
-    next: Stone,
-}
+static COLOR32_LUT: &[Color32] = &[
+    Color32::TRANSPARENT,
+    Color32::BLACK,
+    Color32::WHITE,
+    Color32::BROWN,
+    Color32::DARK_RED,
+    Color32::RED,
+    Color32::LIGHT_RED,
+    Color32::CYAN,
+    Color32::MAGENTA,
+    Color32::YELLOW,
+    Color32::ORANGE,
+    Color32::LIGHT_YELLOW,
+    Color32::KHAKI,
+    Color32::DARK_GREEN,
+    Color32::GREEN,
+    Color32::LIGHT_GREEN,
+    Color32::DARK_BLUE,
+    Color32::BLUE,
+    Color32::LIGHT_BLUE,
+    Color32::PURPLE,
+    Color32::GOLD,
+];
 
-impl GoBoard {
-    fn new(size: usize) -> Self {
+impl UiBoard {
+    fn new(size: usize, tx: Sender<MoveAction>, rx: Receiver<GameMessage>) -> Self {
         Self {
-            size,
-            grid: vec![None; size * size],
-            next: Stone::Black,
+            board: Board::new(size),
+            pending_move: None,
+            tx,
+            rx,
         }
     }
 
-    fn idx(&self, x: usize, y: usize) -> usize {
-        y * self.size + x
-    }
-
-    fn place(&mut self, x: usize, y: usize) {
-        let i = self.idx(x, y);
-        if self.grid[i].is_none() {
-            self.grid[i] = Some(self.next);
-            self.next = match self.next {
-                Stone::Black => Stone::White,
-                Stone::White => Stone::Black,
-            };
-        }
-    }
-}
-
-use eframe::egui::{self};
-
-impl GoBoard {
     pub fn ui(&mut self, ui: &mut egui::Ui) {
-        let board_size_px = 300.0; // total board size
-        let (rect, response) = ui.allocate_exact_size(
-            egui::vec2(board_size_px, board_size_px),
+        let board_size_px = ui.available_size().min_elem();
+        let size = self.board.size();
+
+        if let Ok(msg) = self.rx.try_recv() {
+            match msg {
+                GameMessage::MoveAction(move_action) => match move_action {
+                    MoveAction::Move { stone, coord } => {
+                        self.board.place_stone(coord, stone).unwrap();
+                    }
+                    MoveAction::Pass => todo!(),
+                    MoveAction::Resign => todo!(),
+                },
+                GameMessage::GenMove(stone) => self.pending_move = Some(stone),
+                GameMessage::GameOver => todo!(),
+            }
+        }
+
+        let (response, painter) = ui.allocate_painter(
+            Vec2 {
+                x: board_size_px,
+                y: board_size_px,
+            },
             egui::Sense::click(),
         );
+        let rect = response.rect;
 
-        let painter = ui.painter_at(rect);
-
-        let n = self.size as f32;
+        let n = size as f32;
         let cell = rect.width() / (n - 1.0);
 
         // --- draw grid ---
-        for i in 0..self.size {
+        for i in 0..size {
             let t = i as f32;
 
             // vertical line
@@ -74,7 +109,8 @@ impl GoBoard {
         }
 
         // --- handle click ---
-        if let Some(pos) = response.interact_pointer_pos()
+        if let Some(stone) = self.pending_move
+            && let Some(pos) = response.interact_pointer_pos()
             && response.clicked()
         {
             // convert pixel → board coord
@@ -83,34 +119,35 @@ impl GoBoard {
             let x = (local.x / cell).round() as isize;
             let y = (local.y / cell).round() as isize;
 
-            if x >= 0 && y >= 0 && x < self.size as isize && y < self.size as isize {
-                self.place(x as usize, y as usize);
+            if x >= 0 && y >= 0 && x < size as isize && y < size as isize {
+                let coord = Coord::new(x as usize, y as usize);
+                self.board.place_stone(coord, stone).unwrap();
+                self.tx.send(MoveAction::Move { stone, coord }).unwrap();
+                self.pending_move = None;
             }
         }
 
         // --- draw stones ---
         let radius = cell * 0.4;
+        let board = self.board.board_array();
 
-        for y in 0..self.size {
-            for x in 0..self.size {
-                if let Some(stone) = self.grid[self.idx(x, y)] {
+        for y in 0..size {
+            for x in 0..size {
+                let idx = y * size + x;
+                let stone = board[idx];
+                if stone != Stone::VOID {
                     let center = rect.left_top() + egui::vec2(x as f32 * cell, y as f32 * cell);
 
-                    let color = match stone {
-                        Stone::Black => egui::Color32::BLACK,
-                        Stone::White => egui::Color32::WHITE,
-                    };
+                    let color = COLOR32_LUT[stone.as_usize()];
 
                     painter.circle_filled(center, radius, color);
 
-                    // optional: outline for white stones
-                    if stone == Stone::White {
-                        painter.circle_stroke(
-                            center,
-                            radius,
-                            egui::Stroke::new(1.0, egui::Color32::BLACK),
-                        );
-                    }
+                    // outline
+                    painter.circle_stroke(
+                        center,
+                        radius,
+                        egui::Stroke::new(1.0, egui::Color32::BLACK),
+                    );
                 }
             }
         }
@@ -118,15 +155,15 @@ impl GoBoard {
 }
 
 struct MyApp {
-    board: GoBoard,
+    board: UiBoard,
     show_confirmation_dialog: bool,
     allowed_to_close: bool,
 }
 
-impl Default for MyApp {
-    fn default() -> Self {
+impl MyApp {
+    pub fn new(size: usize, tx: Sender<MoveAction>, rx: Receiver<GameMessage>) -> Self {
         Self {
-            board: GoBoard::new(19),
+            board: UiBoard::new(size, tx, rx),
             show_confirmation_dialog: false,
             allowed_to_close: false,
         }
@@ -170,7 +207,30 @@ impl eframe::App for MyApp {
     }
 }
 
+const BOARD_SIZE: usize = 19;
 fn main() -> eframe::Result<()> {
+    let (move_action_tx, move_action_rx) = mpsc::channel::<MoveAction>();
+    let (game_messgae_tx, game_messgae_rx) = mpsc::channel::<GameMessage>();
+
+    thread::spawn(|| {
+        let team1 = Team::new(
+            Stone::BLACK,
+            vec![
+                Box::new(DummyPlayer::new(BOARD_SIZE)),
+                Box::new(LocalGnugoPlayer::new(BOARD_SIZE).unwrap()),
+            ],
+        );
+        let team2 = Team::new(
+            Stone::WHITE,
+            vec![
+                Box::new(ChannelPlayer::new(game_messgae_tx, move_action_rx)),
+                Box::new(LocalGnugoPlayer::new(BOARD_SIZE).unwrap()),
+            ],
+        );
+        let mut game = Game::new(BOARD_SIZE, vec![team1, team2]);
+        game.run();
+    });
+
     let options = eframe::NativeOptions::default();
 
     eframe::run_native(
@@ -179,7 +239,11 @@ fn main() -> eframe::Result<()> {
         Box::new(|cc| {
             cc.egui_ctx.set_theme(egui::Theme::Light);
 
-            Ok(Box::new(MyApp::default()))
+            Ok(Box::new(MyApp::new(
+                BOARD_SIZE,
+                move_action_tx,
+                game_messgae_rx,
+            )))
         }),
     )
 }
