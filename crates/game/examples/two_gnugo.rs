@@ -1,4 +1,7 @@
-use game::player::{MoveAction, PlayerTrait, local_gnugo_player::LocalGnugoPlayer};
+use game::{
+    Action,
+    player::{PlayerTrait, local_gnugo_player::LocalGnugoPlayer},
+};
 use rustgo::{Stone, board::Board};
 
 const BOARD_SIZE: usize = 9;
@@ -11,25 +14,27 @@ fn main() {
     let mut stone = Stone::BLACK;
     loop {
         if stone == Stone::BLACK {
-            let move_action = player1.genmove(stone).unwrap();
-            match move_action {
-                MoveAction::Move { stone, coord } => {
+            let action = player1.genmove(stone).unwrap();
+            match action {
+                Action::Move { stone, coord } => {
                     board.place_stone(coord, stone).unwrap();
+                    player1.play(stone, coord).unwrap();
+                    player2.play(stone, coord).unwrap();
                 }
-                MoveAction::Pass => todo!(),
-                MoveAction::Resign => todo!(),
+                Action::Pass => todo!(),
+                Action::Resign => todo!(),
             }
-            player2.play(move_action).unwrap();
         } else {
-            let move_action = player2.genmove(stone).unwrap();
-            match move_action {
-                MoveAction::Move { stone, coord } => {
+            let action = player2.genmove(stone).unwrap();
+            match action {
+                Action::Move { stone, coord } => {
                     board.place_stone(coord, stone).unwrap();
+                    player1.play(stone, coord).unwrap();
+                    player2.play(stone, coord).unwrap();
                 }
-                MoveAction::Pass => todo!(),
-                MoveAction::Resign => todo!(),
+                Action::Pass => todo!(),
+                Action::Resign => todo!(),
             }
-            player1.play(move_action).unwrap();
         }
         stone = stone.next_stone(2);
         println!("{}", board.board_string());

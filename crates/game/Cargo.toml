@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 rand = "0.10.0"
 rustgo = { path = "../rustgo" }
+tokio = { version = "1.51.0", features = ["full"] }
 
 [lints.rust]
 unused_must_use = "deny"
