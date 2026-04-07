@@ -1,50 +1,43 @@
-use game::game::Game;
+use game::game::GameBuilder;
+use game::player::PlayerId;
 use game::player::dummy_player::DummyPlayer;
 use game::player::local_gnugo_player::LocalGnugoPlayer;
-use game::player::{PlayerId, PlayerTrait};
-use game::team::{TeamBuilder, TeamHandle, TeamId};
+use game::team::TeamId;
 use rustgo::Stone;
-use tokio::sync::mpsc;
 
 const BOARD_SIZE: usize = 19;
 
 #[tokio::main]
 async fn main() {
-    let (uplink_tx, uplink_rx) = mpsc::channel(1024);
-
-    let mut team_handles = vec![];
-    let mut team_build = TeamBuilder::new();
-
-    let mut player_handles = vec![];
-    team_build.add_team(TeamId::new(0), Stone::BLACK).unwrap();
-    team_build
-        .add_player(TeamId::new(0), PlayerId::new(0), "Dummy0".to_string())
-        .unwrap();
-    let p = DummyPlayer::new(BOARD_SIZE);
-    player_handles.push(p.spawn(PlayerId::new(0), uplink_tx.clone()));
-    team_handles.push(TeamHandle::new(
+    let mut game = GameBuilder::new(BOARD_SIZE);
+    game.add_team(TeamId::new(0), Stone::BLACK);
+    game.add_player(
         TeamId::new(0),
-        Stone::BLACK,
-        player_handles,
-    ));
+        PlayerId::new(0),
+        "Dummy0".to_string(),
+        DummyPlayer::new(BOARD_SIZE),
+    );
+    game.add_player(
+        TeamId::new(0),
+        PlayerId::new(1),
+        "Dummy1".to_string(),
+        DummyPlayer::new(BOARD_SIZE),
+    );
 
-    let mut player_handles = vec![];
-    team_build.add_team(TeamId::new(1), Stone::WHITE).unwrap();
-    team_build
-        .add_player(TeamId::new(1), PlayerId::new(10), "GnuGo0".to_string())
-        .unwrap();
-    let p = LocalGnugoPlayer::new(BOARD_SIZE).unwrap();
-    player_handles.push(p.spawn(PlayerId::new(10), uplink_tx.clone()));
-    team_handles.push(TeamHandle::new(
-        TeamId::new(1),
-        Stone::WHITE,
-        player_handles,
-    ));
+    game.add_team(TeamId::new(10), Stone::WHITE);
+    game.add_player(
+        TeamId::new(10),
+        PlayerId::new(10),
+        "GnuGo0".to_string(),
+        LocalGnugoPlayer::new(BOARD_SIZE).unwrap(),
+    );
+    game.add_player(
+        TeamId::new(10),
+        PlayerId::new(11),
+        "GnuGo1".to_string(),
+        LocalGnugoPlayer::new(BOARD_SIZE).unwrap(),
+    );
 
-    drop(uplink_tx);
-
-    let team_infos = team_build.take();
-
-    let mut game = Game::new(BOARD_SIZE, uplink_rx, team_infos, team_handles);
+    let mut game = game.build();
     game.run().await;
 }

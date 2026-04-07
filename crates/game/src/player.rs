@@ -1,7 +1,5 @@
-use rustgo::{Coord, Stone};
-use tokio::sync::mpsc::{self, Sender, error::SendError};
-
-use crate::{Action, PlayerMessage, ServerMessage, team::TeamId};
+use crate::{PlayerMessage, ServerMessage, team::TeamId};
+use tokio::sync::mpsc::{Receiver, Sender};
 
 #[derive(Debug)]
 pub enum PlayerError {
@@ -33,26 +31,36 @@ pub struct PlayerInfo {
 
 pub struct PlayerHandle {
     pub player_id: PlayerId,
+    pub player_name: String,
 
     /// server -> player
     pub downlink_tx: Sender<ServerMessage>,
 }
 impl PlayerHandle {
+    pub fn new(
+        player_id: PlayerId,
+        player_name: String,
+        downlink_tx: Sender<ServerMessage>,
+    ) -> Self {
+        Self {
+            player_id,
+            player_name,
+            downlink_tx,
+        }
+    }
+
     pub async fn send(&self, msg: ServerMessage) {
         self.downlink_tx.send(msg).await.unwrap();
     }
 }
 
 pub trait PlayerTrait {
-    fn spawn(self, player_id: PlayerId, uplink_tx: Sender<PlayerMessage>) -> PlayerHandle;
-
-    /// others placed `stone` at `coord`
-    /// self should acknowledge this info
-    fn play(&mut self, stone: Stone, coord: Coord) -> Result<(), PlayerError>;
-
-    /// Player只返回落子选择, 不能修改自身的棋盘状态, 该落子是否合法需要得到服务器的确认 ServerMessage::PlayerMove 才算落子成功
-    /// (所以GnuGo里不应该用 genmove, 而应该用 reg_genmove)
-    fn genmove(&mut self, stone: Stone) -> Result<Action, PlayerError>;
+    fn run(
+        self,
+        player_id: PlayerId,
+        uplink_tx: Sender<PlayerMessage>,
+        downlink_rx: Receiver<ServerMessage>,
+    );
 }
 #[cfg(feature = "broken")]
 pub mod channel_player;

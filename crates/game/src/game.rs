@@ -1,12 +1,12 @@
 use std::vec;
 
 use rustgo::{Stone, board::Board};
-use tokio::sync::mpsc::Receiver;
+use tokio::sync::mpsc::{self, Receiver, Sender};
 
 use crate::{
     Action, PlayerMessage, ServerMessage,
-    player::{PlayerId, PlayerInfo},
-    team::{TeamHandle, TeamId, TeamInfo},
+    player::{PlayerHandle, PlayerId, PlayerTrait},
+    team::{TeamHandle, TeamId},
 };
 
 pub struct Game {
@@ -15,16 +15,69 @@ pub struct Game {
     uplink_rx: Receiver<PlayerMessage>,
 
     team_handles: Vec<TeamHandle>,
-    team_infos: Vec<TeamInfo>,
     cur_team_index: usize,
     cur_player_index: Vec<usize>,
+}
+
+pub struct GameBuilder {
+    size: usize,
+    uplink_tx: Sender<PlayerMessage>,
+    uplink_rx: Receiver<PlayerMessage>,
+    team_handles: Vec<TeamHandle>,
+}
+
+impl GameBuilder {
+    pub fn new(size: usize) -> Self {
+        let (uplink_tx, uplink_rx) = mpsc::channel(1024);
+        Self {
+            size,
+            uplink_tx,
+            uplink_rx,
+            team_handles: vec![],
+        }
+    }
+
+    pub fn add_team(&mut self, team_id: TeamId, stone: Stone) {
+        if self.team_handles.iter().any(|t| t.team_id == team_id) {
+            panic!("should not have team with {:?}", team_id);
+        }
+
+        let team_handle = TeamHandle::new(team_id, stone, vec![]);
+        self.team_handles.push(team_handle);
+    }
+
+    pub fn add_player(
+        &mut self,
+        team_id: TeamId,
+        player_id: PlayerId,
+        player_name: String,
+        player: impl PlayerTrait,
+    ) {
+        let Some(team) = self.team_handles.iter_mut().find(|t| t.team_id == team_id) else {
+            panic!("should have team with {:?}", team_id);
+        };
+        if team.players.iter().any(|p| p.player_id == player_id) {
+            panic!("should not have player with {:?}", player_id);
+        }
+
+        let (downlink_tx, downlink_rx) = mpsc::channel(32);
+        player.run(player_id, self.uplink_tx.clone(), downlink_rx);
+
+        let player_handle = PlayerHandle::new(player_id, player_name, downlink_tx);
+        team.players.push(player_handle);
+    }
+
+    pub fn build(self) -> Game {
+        // drop builder's sender so the game loop can exit once all players stop.
+        drop(self.uplink_tx);
+        Game::new(self.size, self.uplink_rx, self.team_handles)
+    }
 }
 
 impl Game {
     pub fn new(
         size: usize,
         uplink_rx: Receiver<PlayerMessage>,
-        team_infos: Vec<TeamInfo>,
         team_handles: Vec<TeamHandle>,
     ) -> Self {
         // TODO check stone
@@ -33,7 +86,6 @@ impl Game {
             board: Board::new(size),
             uplink_rx: uplink_rx,
             team_handles: team_handles,
-            team_infos: team_infos,
             cur_team_index: 0,
             cur_player_index: vec![0; len],
         }
@@ -77,8 +129,8 @@ impl Game {
 
     pub async fn run(&mut self) {
         // 广播开局信息
-        self.broadcast(ServerMessage::GameStart(self.team_infos.clone()))
-            .await;
+        // TODO 开局计算出 team_infos
+        // self.broadcast(ServerMessage::GameStart(self.team_infos.clone())).await;
 
         self.genmove().await;
         while let Some(msg) = self.uplink_rx.recv().await {

@@ -14,7 +14,7 @@ Client-Server架构
 
 Server
 - Board: 中国规则的围棋棋盘
-- Game: 棋局, 调度多个Player (使用协程? TODO)
+- Game: 对局控制器, 使用协程调度多个Player
 
 - Player接口
   - 可以对接 GTP in child process (pipe) 的 GoEngine
@@ -28,7 +28,7 @@ Server
   - 抽离disjoint_set，固定其Idx类型
   - board中的idx直接用usize，方便计算
   - type stone_nums
-- GTP with gnugo
 - learn cfg
   - use feature Conditional compilation
-- TUI 用不同颜色的●表示多色棋
+- TUI
+- 削减pub
