@@ -62,7 +62,7 @@ pub trait PlayerTrait {
         downlink_rx: Receiver<ServerMessage>,
     );
 }
-#[cfg(feature = "broken")]
+
 pub mod channel_player;
 pub mod dummy_player;
 pub mod local_gnugo_player;

@@ -130,6 +130,7 @@ impl Game {
     pub async fn run(&mut self) {
         // 广播开局信息
         // TODO 开局计算出 team_infos
+        // 开局信息也应该包括 board.size, 各个player收到size之后才能准备界面、init engine
         // self.broadcast(ServerMessage::GameStart(self.team_infos.clone())).await;
 
         self.genmove().await;

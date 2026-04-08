@@ -9,6 +9,7 @@ eframe = { version = "0.34.1", default-features = false, features = [
 ] }
 rustgo = { path = "../rustgo" }
 game = { path = "../game" }
+tokio = { version = "1.51.1", features = ["full"] }
 
 [lints.rust]
 unused_must_use = "deny"
