@@ -32,3 +32,4 @@ Server
   - use feature Conditional compilation
 - TUI
 - 削减pub
+- 聊天中 Bot名字+闭嘴
