@@ -1,13 +1,10 @@
-use std::time::Duration;
+use std::sync::{Arc, Mutex};
 
 use eframe::egui::{self, Color32, Vec2};
 use game::{
     Action, PlayerMessage, ServerMessage,
-    game::{Game, GameBuilder},
-    player::{
-        PlayerId, channel_player::ChannelPlayer, dummy_player::DummyPlayer,
-        local_gnugo_player::LocalGnugoPlayer,
-    },
+    game::GameBuilder,
+    player::{PlayerId, channel_player::ChannelPlayer, dummy_player::DummyPlayer},
     team::TeamId,
 };
 use rustgo::{Coord, Stone, board::Board};
@@ -16,8 +13,7 @@ use tokio::sync::mpsc::{self, Receiver, Sender};
 struct UiBoard {
     board: Board,
     pending_move: Option<Stone>,
-    ui_tx: Sender<PlayerMessage>,   // 点击事件，发出信息
-    ui_rx: Receiver<ServerMessage>, // 接收信息，更新棋盘
+    ui_tx: Sender<PlayerMessage>, // 点击事件，发出信息
 }
 
 static COLOR32_LUT: &[Color32] = &[
@@ -25,7 +21,6 @@ static COLOR32_LUT: &[Color32] = &[
     Color32::BLACK,
     Color32::WHITE,
     Color32::BROWN,
-    Color32::DARK_RED,
     Color32::RED,
     Color32::LIGHT_RED,
     Color32::CYAN,
@@ -45,44 +40,17 @@ static COLOR32_LUT: &[Color32] = &[
 ];
 
 impl UiBoard {
-    fn new(size: usize, ui_tx: Sender<PlayerMessage>, ui_rx: Receiver<ServerMessage>) -> Self {
+    fn new(size: usize, ui_tx: Sender<PlayerMessage>) -> Self {
         Self {
             board: Board::new(size),
             pending_move: None,
             ui_tx,
-            ui_rx,
         }
     }
 
     pub fn ui(&mut self, ui: &mut egui::Ui) {
         let board_size_px = ui.available_size().min_elem();
         let size = self.board.size();
-
-        if let Ok(msg) = self.ui_rx.try_recv() {
-            match msg {
-                ServerMessage::GameStart(team_infos) => todo!(),
-                ServerMessage::GameUpdate {
-                    cur_team,
-                    cur_player,
-                    player_info,
-                } => {
-                    // TODO
-                }
-                ServerMessage::PlayerMove {
-                    player_id,
-                    stone,
-                    coord,
-                } => {
-                    self.board.place_stone(coord, stone).unwrap();
-                }
-                ServerMessage::PlayerChat { player_id, chat } => {
-                    println!("egui hear {} from player[{:?}]", chat, player_id)
-                }
-                ServerMessage::GenMove(stone) => self.pending_move = Some(stone),
-                ServerMessage::Error(_) => todo!(),
-                ServerMessage::GameOver => todo!(),
-            }
-        }
 
         let (response, painter) = ui.allocate_painter(
             Vec2 {
@@ -172,15 +140,62 @@ impl UiBoard {
 }
 
 struct MyApp {
-    board: UiBoard,
+    board_ui: Arc<Mutex<UiBoard>>,
     show_confirmation_dialog: bool,
     allowed_to_close: bool,
 }
 
 impl MyApp {
-    pub fn new(size: usize, ui_tx: Sender<PlayerMessage>, ui_rx: Receiver<ServerMessage>) -> Self {
+    pub fn new(
+        cc: &eframe::CreationContext,
+        size: usize,
+        ui_tx: Sender<PlayerMessage>,
+        mut ui_rx: Receiver<ServerMessage>,
+    ) -> Self {
+        let board_ui = Arc::new(Mutex::new(UiBoard::new(size, ui_tx)));
+
+        {
+            let ctx = cc.egui_ctx.clone();
+            let board_ui = board_ui.clone();
+            tokio::spawn(async move {
+                while let Some(msg) = ui_rx.recv().await {
+                    match msg {
+                        ServerMessage::GameStart(team_infos) => todo!(),
+                        ServerMessage::GameUpdate {
+                            cur_team,
+                            cur_player,
+                            player_info,
+                        } => {
+                            // TODO
+                        }
+                        ServerMessage::PlayerMove {
+                            player_id,
+                            stone,
+                            coord,
+                        } => {
+                            board_ui
+                                .lock()
+                                .unwrap()
+                                .board
+                                .place_stone(coord, stone)
+                                .unwrap();
+                        }
+                        ServerMessage::PlayerChat { player_id, chat } => {
+                            println!("egui hear {} from player[{:?}]", chat, player_id)
+                        }
+                        ServerMessage::GenMove(stone) => {
+                            board_ui.lock().unwrap().pending_move = Some(stone)
+                        }
+                        ServerMessage::Error(_) => todo!(),
+                        ServerMessage::GameOver => todo!(),
+                    }
+                    ctx.request_repaint();
+                }
+            });
+        }
+
         Self {
-            board: UiBoard::new(size, ui_tx, ui_rx),
+            board_ui,
             show_confirmation_dialog: false,
             allowed_to_close: false,
         }
@@ -190,7 +205,7 @@ impl MyApp {
 impl eframe::App for MyApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show_inside(ui, |ui| {
-            self.board.ui(ui);
+            self.board_ui.lock().unwrap().ui(ui);
         });
 
         if ui.input(|i| i.viewport().close_requested()) {
@@ -240,26 +255,18 @@ async fn main() -> eframe::Result<()> {
             "egui".to_string(),
             ChannelPlayer::new(downlink_to_ui, uplink_from_ui),
         );
-        game.add_player(
-            TeamId::new(0),
-            PlayerId::new(1),
-            "GnuGo0".to_string(),
-            LocalGnugoPlayer::new(BOARD_SIZE).unwrap(),
-        );
 
-        game.add_team(TeamId::new(1), Stone::WHITE);
-        game.add_player(
-            TeamId::new(1),
-            PlayerId::new(10),
-            "GnuGo1".to_string(),
-            LocalGnugoPlayer::new(BOARD_SIZE).unwrap(),
-        );
-        game.add_player(
-            TeamId::new(1),
-            PlayerId::new(11),
-            "Dummy".to_string(),
-            DummyPlayer::new(BOARD_SIZE),
-        );
+        for team_n in 1..6 {
+            game.add_team(TeamId::new(team_n), Stone::new(1 + team_n as u8));
+            for player_n in 0..team_n {
+                game.add_player(
+                    TeamId::new(team_n),
+                    PlayerId::new(team_n * 10 + player_n),
+                    format!("Dummy{}", team_n * 10 + player_n),
+                    DummyPlayer::new(BOARD_SIZE),
+                );
+            }
+        }
 
         let mut game = game.build();
         game.run().await;
@@ -272,9 +279,7 @@ async fn main() -> eframe::Result<()> {
         options,
         Box::new(|cc| {
             cc.egui_ctx.set_theme(egui::Theme::Light);
-            Ok(Box::new(MyApp::new(BOARD_SIZE, ui_tx, ui_rx)))
+            Ok(Box::new(MyApp::new(cc, BOARD_SIZE, ui_tx, ui_rx)))
         }),
     )
-
-    // TODO ui_rx 放到另一个协程中，处理消息，更新MyApp状态，然后 ui.request_repaint()？ 现在消息来了ui是不会被唤醒的，界面也不会被更新
 }

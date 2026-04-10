@@ -66,7 +66,7 @@ impl PlayerTrait for DummyPlayer {
                             );
                         }
                         ServerMessage::GenMove(stone) => {
-                            sleep(Duration::from_micros(500)).await;
+                            sleep(Duration::from_secs(1)).await;
                             let action = self.genmove(stone).unwrap();
 
                             uplink_tx
