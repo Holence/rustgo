@@ -16,6 +16,7 @@ use crate::{
 };
 
 pub struct LocalGnugoPlayer {
+    player_id: PlayerId,
     size: usize,
     child: Child,
     writer: ChildStdin,
@@ -31,7 +32,7 @@ impl Drop for LocalGnugoPlayer {
 }
 
 impl LocalGnugoPlayer {
-    pub fn new(size: usize) -> io::Result<LocalGnugoPlayer> {
+    pub fn new(player_id: PlayerId, size: usize) -> io::Result<LocalGnugoPlayer> {
         let child = Command::new("gnugo")
             .args(["--mode=gtp", "--chinese-rules", "--level=10"])
             .stdin(Stdio::piped())
@@ -57,8 +58,9 @@ impl LocalGnugoPlayer {
         let stdin = child.stdin.take().unwrap();
 
         let mut player = LocalGnugoPlayer {
-            size: size,
-            child: child,
+            player_id,
+            size,
+            child,
             writer: stdin,
             reader: reader,
         };
@@ -139,12 +141,7 @@ impl LocalGnugoPlayer {
 }
 
 impl PlayerTrait for LocalGnugoPlayer {
-    fn run(
-        mut self,
-        player_id: PlayerId,
-        uplink_tx: Sender<PlayerMessage>,
-        mut downlink_rx: Receiver<ServerMessage>,
-    ) {
+    fn run(mut self, uplink_tx: Sender<PlayerMessage>, mut downlink_rx: Receiver<ServerMessage>) {
         tokio::spawn(async move {
             loop {
                 if let Some(msg) = downlink_rx.recv().await {
@@ -152,13 +149,10 @@ impl PlayerTrait for LocalGnugoPlayer {
                         ServerMessage::PlayerMove { stone, coord, .. } => {
                             self.play(stone, coord).await.unwrap();
                         }
-                        ServerMessage::PlayerChat {
-                            player_id: player_id2,
-                            chat,
-                        } => {
+                        ServerMessage::PlayerChat { player_id, chat } => {
                             println!(
-                                "Player[{}] hear Player[{}] says: {}",
-                                player_id.0, player_id2.0, chat
+                                "Player[{:?}] hear Player[{:?}] says: {}",
+                                self.player_id, player_id, chat
                             );
                         }
                         ServerMessage::GenMove(stone) => {
@@ -166,13 +160,16 @@ impl PlayerTrait for LocalGnugoPlayer {
                             let action = self.genmove(stone).await.unwrap();
 
                             uplink_tx
-                                .send(PlayerMessage::PlayerAction { player_id, action })
+                                .send(PlayerMessage::PlayerAction {
+                                    player_id: self.player_id,
+                                    action,
+                                })
                                 .await
                                 .unwrap();
 
                             uplink_tx
                                 .send(PlayerMessage::PlayerChat {
-                                    player_id,
+                                    player_id: self.player_id,
                                     chat: format!("i choose {:?}", action),
                                 })
                                 .await
@@ -187,6 +184,10 @@ impl PlayerTrait for LocalGnugoPlayer {
             }
         });
     }
+
+    fn player_id(&self) -> PlayerId {
+        self.player_id
+    }
 }
 
 #[cfg(test)]
@@ -199,8 +200,8 @@ mod tests {
     async fn two_gnugo() {
         const BOARD_SIZE: usize = 9;
         let mut board = Board::new(BOARD_SIZE);
-        let mut player1 = LocalGnugoPlayer::new(BOARD_SIZE).unwrap();
-        let mut player2 = LocalGnugoPlayer::new(BOARD_SIZE).unwrap();
+        let mut player1 = LocalGnugoPlayer::new(PlayerId::new(0), BOARD_SIZE).unwrap();
+        let mut player2 = LocalGnugoPlayer::new(PlayerId::new(1), BOARD_SIZE).unwrap();
 
         let mut stone = Stone::BLACK;
         loop {

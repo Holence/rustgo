@@ -10,12 +10,6 @@ use game::{
 use rustgo::{Coord, Stone, board::Board};
 use tokio::sync::mpsc::{self, Receiver, Sender};
 
-struct UiBoard {
-    board: Board,
-    pending_move: Option<Stone>,
-    ui_tx: Sender<PlayerMessage>, // 点击事件，发出信息
-}
-
 static COLOR32_LUT: &[Color32] = &[
     Color32::TRANSPARENT,
     Color32::BLACK,
@@ -39,9 +33,19 @@ static COLOR32_LUT: &[Color32] = &[
     Color32::GOLD,
 ];
 
+struct UiBoard {
+    player_id: PlayerId,
+    size: usize,
+    board: Board,
+    pending_move: Option<Stone>,
+    ui_tx: Sender<PlayerMessage>, // 点击事件，发出信息
+}
+
 impl UiBoard {
-    fn new(size: usize, ui_tx: Sender<PlayerMessage>) -> Self {
+    fn new(player_id: PlayerId, size: usize, ui_tx: Sender<PlayerMessage>) -> Self {
         Self {
+            player_id,
+            size,
             board: Board::new(size),
             pending_move: None,
             ui_tx,
@@ -50,7 +54,6 @@ impl UiBoard {
 
     pub fn ui(&mut self, ui: &mut egui::Ui) {
         let board_size_px = ui.available_size().min_elem();
-        let size = self.board.size();
 
         let (response, painter) = ui.allocate_painter(
             Vec2 {
@@ -61,11 +64,11 @@ impl UiBoard {
         );
         let rect = response.rect;
 
-        let n = size as f32;
+        let n = self.size as f32;
         let cell = rect.width() / (n - 1.0);
 
         // --- draw grid ---
-        for i in 0..size {
+        for i in 0..self.size {
             let t = i as f32;
 
             // vertical line
@@ -98,12 +101,12 @@ impl UiBoard {
             let x = (local.x / cell).round() as isize;
             let y = (local.y / cell).round() as isize;
 
-            if x >= 0 && y >= 0 && x < size as isize && y < size as isize {
+            if x >= 0 && y >= 0 && x < self.size as isize && y < self.size as isize {
                 let coord = Coord::new(x as usize, y as usize);
 
                 self.ui_tx
                     .try_send(PlayerMessage::PlayerAction {
-                        player_id: PlayerId::new(0), // TODO replace me
+                        player_id: self.player_id,
                         action: Action::Move { stone, coord },
                     })
                     .unwrap();
@@ -116,9 +119,9 @@ impl UiBoard {
         let radius = cell * 0.4;
         let board = self.board.board_array();
 
-        for y in 0..size {
-            for x in 0..size {
-                let idx = y * size + x;
+        for y in 0..self.size {
+            for x in 0..self.size {
+                let idx = y * self.size + x;
                 let stone = board[idx];
                 if stone != Stone::VOID {
                     let center = rect.left_top() + egui::vec2(x as f32 * cell, y as f32 * cell);
@@ -148,11 +151,12 @@ struct MyApp {
 impl MyApp {
     pub fn new(
         cc: &eframe::CreationContext,
+        player_id: PlayerId,
         size: usize,
         ui_tx: Sender<PlayerMessage>,
         mut ui_rx: Receiver<ServerMessage>,
     ) -> Self {
-        let board_ui = Arc::new(Mutex::new(UiBoard::new(size, ui_tx)));
+        let board_ui = Arc::new(Mutex::new(UiBoard::new(player_id, size, ui_tx)));
 
         {
             let ctx = cc.egui_ctx.clone();
@@ -186,7 +190,9 @@ impl MyApp {
                         ServerMessage::GenMove(stone) => {
                             board_ui.lock().unwrap().pending_move = Some(stone)
                         }
-                        ServerMessage::Error(_) => todo!(),
+                        ServerMessage::Error(msg) => {
+                            println!("ServerMessage::Error: {}", msg);
+                        }
                         ServerMessage::GameOver => todo!(),
                     }
                     ctx.request_repaint();
@@ -200,12 +206,16 @@ impl MyApp {
             allowed_to_close: false,
         }
     }
+
+    fn ui(&mut self, ui: &mut egui::Ui) {
+        self.board_ui.lock().unwrap().ui(ui)
+    }
 }
 
 impl eframe::App for MyApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show_inside(ui, |ui| {
-            self.board_ui.lock().unwrap().ui(ui);
+            self.ui(ui);
         });
 
         if ui.input(|i| i.viewport().close_requested()) {
@@ -251,9 +261,7 @@ async fn main() -> eframe::Result<()> {
         game.add_team(TeamId::new(0), Stone::BLACK);
         game.add_player(
             TeamId::new(0),
-            PlayerId::new(0),
-            "egui".to_string(),
-            ChannelPlayer::new(downlink_to_ui, uplink_from_ui),
+            ChannelPlayer::new(PlayerId::new(0), downlink_to_ui, uplink_from_ui),
         );
 
         for team_n in 1..6 {
@@ -261,9 +269,7 @@ async fn main() -> eframe::Result<()> {
             for player_n in 0..team_n {
                 game.add_player(
                     TeamId::new(team_n),
-                    PlayerId::new(team_n * 10 + player_n),
-                    format!("Dummy{}", team_n * 10 + player_n),
-                    DummyPlayer::new(BOARD_SIZE),
+                    DummyPlayer::new(PlayerId::new(team_n * 10 + player_n), BOARD_SIZE),
                 );
             }
         }
@@ -279,7 +285,13 @@ async fn main() -> eframe::Result<()> {
         options,
         Box::new(|cc| {
             cc.egui_ctx.set_theme(egui::Theme::Light);
-            Ok(Box::new(MyApp::new(cc, BOARD_SIZE, ui_tx, ui_rx)))
+            Ok(Box::new(MyApp::new(
+                cc,
+                PlayerId::new(0),
+                BOARD_SIZE,
+                ui_tx,
+                ui_rx,
+            )))
         }),
     )
 }

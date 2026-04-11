@@ -46,24 +46,19 @@ impl GameBuilder {
         self.team_handles.push(team_handle);
     }
 
-    pub fn add_player(
-        &mut self,
-        team_id: TeamId,
-        player_id: PlayerId,
-        player_name: String,
-        player: impl PlayerTrait,
-    ) {
+    pub fn add_player(&mut self, team_id: TeamId, player: impl PlayerTrait) {
         let Some(team) = self.team_handles.iter_mut().find(|t| t.team_id == team_id) else {
             panic!("should have team with {:?}", team_id);
         };
+        let player_id = player.player_id();
         if team.players.iter().any(|p| p.player_id == player_id) {
             panic!("should not have player with {:?}", player_id);
         }
 
         let (downlink_tx, downlink_rx) = mpsc::channel(32);
-        player.run(player_id, self.uplink_tx.clone(), downlink_rx);
+        player.run(self.uplink_tx.clone(), downlink_rx);
 
-        let player_handle = PlayerHandle::new(player_id, player_name, downlink_tx);
+        let player_handle = PlayerHandle::new(player_id, downlink_tx);
         team.players.push(player_handle);
     }
 

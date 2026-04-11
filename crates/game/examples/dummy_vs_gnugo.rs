@@ -13,29 +13,21 @@ async fn main() {
     game.add_team(TeamId::new(0), Stone::BLACK);
     game.add_player(
         TeamId::new(0),
-        PlayerId::new(0),
-        "Dummy0".to_string(),
-        DummyPlayer::new(BOARD_SIZE),
+        DummyPlayer::new(PlayerId::new(0), BOARD_SIZE),
     );
     game.add_player(
         TeamId::new(0),
-        PlayerId::new(1),
-        "Dummy1".to_string(),
-        DummyPlayer::new(BOARD_SIZE),
+        DummyPlayer::new(PlayerId::new(1), BOARD_SIZE),
     );
 
     game.add_team(TeamId::new(10), Stone::WHITE);
     game.add_player(
         TeamId::new(10),
-        PlayerId::new(10),
-        "GnuGo0".to_string(),
-        LocalGnugoPlayer::new(BOARD_SIZE).unwrap(),
+        LocalGnugoPlayer::new(PlayerId::new(10), BOARD_SIZE).unwrap(),
     );
     game.add_player(
         TeamId::new(10),
-        PlayerId::new(11),
-        "GnuGo1".to_string(),
-        LocalGnugoPlayer::new(BOARD_SIZE).unwrap(),
+        LocalGnugoPlayer::new(PlayerId::new(11), BOARD_SIZE).unwrap(),
     );
 
     let mut game = game.build();

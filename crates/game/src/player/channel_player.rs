@@ -1,19 +1,22 @@
 use tokio::sync::mpsc::{Receiver, Sender};
 
-use crate::player::{PlayerMessage, PlayerTrait, ServerMessage};
+use crate::player::{PlayerId, PlayerMessage, PlayerTrait, ServerMessage};
 
 // 用channel连接的Player，仅用于对接GUI前端
 pub struct ChannelPlayer {
+    player_id: PlayerId,
     downlink_to_ui: Sender<ServerMessage>,
     uplink_from_ui: Receiver<PlayerMessage>,
 }
 
 impl ChannelPlayer {
     pub fn new(
+        player_id: PlayerId,
         downlink_to_ui: Sender<ServerMessage>,
         uplink_from_ui: Receiver<PlayerMessage>,
     ) -> Self {
         ChannelPlayer {
+            player_id,
             downlink_to_ui,
             uplink_from_ui,
         }
@@ -21,12 +24,7 @@ impl ChannelPlayer {
 }
 
 impl PlayerTrait for ChannelPlayer {
-    fn run(
-        mut self,
-        player_id: super::PlayerId, // TODO useless??
-        uplink_tx: Sender<PlayerMessage>,
-        mut downlink_rx: Receiver<ServerMessage>,
-    ) {
+    fn run(mut self, uplink_tx: Sender<PlayerMessage>, mut downlink_rx: Receiver<ServerMessage>) {
         tokio::spawn(async move {
             loop {
                 tokio::select! {
@@ -39,5 +37,9 @@ impl PlayerTrait for ChannelPlayer {
                 };
             }
         });
+    }
+
+    fn player_id(&self) -> super::PlayerId {
+        self.player_id
     }
 }

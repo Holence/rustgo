@@ -31,20 +31,14 @@ pub struct PlayerInfo {
 
 pub struct PlayerHandle {
     pub player_id: PlayerId,
-    pub player_name: String,
 
     /// server -> player
     pub downlink_tx: Sender<ServerMessage>,
 }
 impl PlayerHandle {
-    pub fn new(
-        player_id: PlayerId,
-        player_name: String,
-        downlink_tx: Sender<ServerMessage>,
-    ) -> Self {
+    pub fn new(player_id: PlayerId, downlink_tx: Sender<ServerMessage>) -> Self {
         Self {
             player_id,
-            player_name,
             downlink_tx,
         }
     }
@@ -55,12 +49,9 @@ impl PlayerHandle {
 }
 
 pub trait PlayerTrait {
-    fn run(
-        self,
-        player_id: PlayerId,
-        uplink_tx: Sender<PlayerMessage>,
-        downlink_rx: Receiver<ServerMessage>,
-    );
+    fn run(self, uplink_tx: Sender<PlayerMessage>, downlink_rx: Receiver<ServerMessage>);
+
+    fn player_id(&self) -> PlayerId;
 }
 
 pub mod channel_player;

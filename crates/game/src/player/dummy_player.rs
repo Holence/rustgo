@@ -13,13 +13,15 @@ use crate::{
 };
 
 pub struct DummyPlayer {
+    player_id: PlayerId,
     board: Board,
     rng: StdRng,
 }
 
 impl DummyPlayer {
-    pub fn new(size: usize) -> Self {
+    pub fn new(player_id: PlayerId, size: usize) -> Self {
         DummyPlayer {
+            player_id,
             board: Board::new(size),
             rng: rand::make_rng(),
         }
@@ -43,12 +45,7 @@ impl DummyPlayer {
 }
 
 impl PlayerTrait for DummyPlayer {
-    fn run(
-        mut self,
-        player_id: PlayerId,
-        uplink_tx: Sender<PlayerMessage>,
-        mut downlink_rx: Receiver<ServerMessage>,
-    ) {
+    fn run(mut self, uplink_tx: Sender<PlayerMessage>, mut downlink_rx: Receiver<ServerMessage>) {
         tokio::spawn(async move {
             loop {
                 if let Some(msg) = downlink_rx.recv().await {
@@ -56,27 +53,27 @@ impl PlayerTrait for DummyPlayer {
                         ServerMessage::PlayerMove { stone, coord, .. } => {
                             self.play(stone, coord).unwrap();
                         }
-                        ServerMessage::PlayerChat {
-                            player_id: player_id2,
-                            chat,
-                        } => {
+                        ServerMessage::PlayerChat { player_id, chat } => {
                             println!(
-                                "Player[{}] hear Player[{}] says: {}",
-                                player_id.0, player_id2.0, chat
+                                "Player[{:?}] hear Player[{:?}] says: {}",
+                                self.player_id, player_id, chat
                             );
                         }
                         ServerMessage::GenMove(stone) => {
-                            sleep(Duration::from_secs(1)).await;
+                            // sleep(Duration::from_secs(1)).await;
                             let action = self.genmove(stone).unwrap();
 
                             uplink_tx
-                                .send(PlayerMessage::PlayerAction { player_id, action })
+                                .send(PlayerMessage::PlayerAction {
+                                    player_id: self.player_id,
+                                    action,
+                                })
                                 .await
                                 .unwrap();
 
                             uplink_tx
                                 .send(PlayerMessage::PlayerChat {
-                                    player_id,
+                                    player_id: self.player_id,
                                     chat: format!("i choose {:?}", action),
                                 })
                                 .await
@@ -85,7 +82,7 @@ impl PlayerTrait for DummyPlayer {
                         ServerMessage::Error(_) => {
                             uplink_tx
                                 .send(PlayerMessage::PlayerChat {
-                                    player_id,
+                                    player_id: self.player_id,
                                     chat: "oh shit".to_string(),
                                 })
                                 .await
@@ -96,5 +93,9 @@ impl PlayerTrait for DummyPlayer {
                 }
             }
         });
+    }
+
+    fn player_id(&self) -> PlayerId {
+        self.player_id
     }
 }
