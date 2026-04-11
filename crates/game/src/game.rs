@@ -26,6 +26,7 @@ pub struct GameBuilder {
     team_handles: Vec<TeamHandle>,
 }
 
+// TODO actor model???
 impl GameBuilder {
     pub fn new(size: usize) -> Self {
         let (uplink_tx, uplink_rx) = mpsc::channel(1024);
@@ -39,7 +40,10 @@ impl GameBuilder {
 
     pub fn add_team(&mut self, team_id: TeamId, stone: Stone) {
         if self.team_handles.iter().any(|t| t.team_id == team_id) {
-            panic!("should not have team with {:?}", team_id);
+            panic!("team_id already exist: {:?}", team_id);
+        }
+        if self.team_handles.iter().any(|t| t.stone == stone) {
+            panic!("stone already exist: {:?}", stone);
         }
 
         let team_handle = TeamHandle::new(team_id, stone, vec![]);
@@ -47,19 +51,35 @@ impl GameBuilder {
     }
 
     pub fn add_player(&mut self, team_id: TeamId, player: impl PlayerTrait) {
-        let Some(team) = self.team_handles.iter_mut().find(|t| t.team_id == team_id) else {
-            panic!("should have team with {:?}", team_id);
+        // find team
+        let Some(team_idx) = self
+            .team_handles
+            .iter()
+            .enumerate()
+            .find_map(|(team_idx, t)| {
+                if t.team_id == team_id {
+                    Some(team_idx)
+                } else {
+                    None
+                }
+            })
+        else {
+            panic!("team_id not exist: {:?}", team_id);
         };
+
+        // assert player not in any team
         let player_id = player.player_id();
-        if team.players.iter().any(|p| p.player_id == player_id) {
-            panic!("should not have player with {:?}", player_id);
+        for team in &self.team_handles {
+            if team.players.iter().any(|p| p.player_id == player_id) {
+                panic!("player_id already exist: {:?}", player_id);
+            }
         }
 
         let (downlink_tx, downlink_rx) = mpsc::channel(32);
         player.run(self.uplink_tx.clone(), downlink_rx);
 
         let player_handle = PlayerHandle::new(player_id, downlink_tx);
-        team.players.push(player_handle);
+        self.team_handles[team_idx].players.push(player_handle);
     }
 
     pub fn build(self) -> Game {
@@ -75,7 +95,6 @@ impl Game {
         uplink_rx: Receiver<PlayerMessage>,
         team_handles: Vec<TeamHandle>,
     ) -> Self {
-        // TODO check stone
         let len = team_handles.len();
         Self {
             board: Board::new(size),
