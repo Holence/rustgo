@@ -92,26 +92,35 @@ impl UiBoard {
 
         // --- handle click ---
         if let Some(stone) = self.pending_move
-            && let Some(pos) = response.interact_pointer_pos()
             && response.clicked()
+            && let Some(pos) = response.interact_pointer_pos()
+            && pos.x >= rect.min.x
+            && pos.y >= rect.min.y
         {
             // convert pixel → board coord
             let local = pos - rect.min;
+            dbg!(cell, local);
 
-            let x = (local.x / cell).round() as isize;
-            let y = (local.y / cell).round() as isize;
+            let x = local.x / cell;
+            let x_round = x.round();
+            let y = local.y / cell;
+            let y_round = y.round();
+            const THRESH_PERCENT: f32 = 0.2; // 鼠标点击位置距离交叉点的阈值
+            if (x_round - x).abs() < THRESH_PERCENT && (y_round - y).abs() < THRESH_PERCENT {
+                let x = x_round as usize;
+                let y = y_round as usize;
+                if x < self.size && y < self.size {
+                    let coord = Coord::new(x, y);
 
-            if x >= 0 && y >= 0 && x < self.size as isize && y < self.size as isize {
-                let coord = Coord::new(x as usize, y as usize);
+                    self.ui_tx
+                        .try_send(PlayerMessage::PlayerAction {
+                            player_id: self.player_id,
+                            action: Action::Move { stone, coord },
+                        })
+                        .unwrap();
 
-                self.ui_tx
-                    .try_send(PlayerMessage::PlayerAction {
-                        player_id: self.player_id,
-                        action: Action::Move { stone, coord },
-                    })
-                    .unwrap();
-
-                self.pending_move = None;
+                    self.pending_move = None;
+                }
             }
         }
 
