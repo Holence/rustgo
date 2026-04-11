@@ -10,6 +10,19 @@ use game::{
 use rustgo::{Coord, Stone, board::Board};
 use tokio::sync::mpsc::{self, Receiver, Sender};
 
+// 19x19棋盘的星位
+const STAR: [(usize, usize); 9] = [
+    (3, 3),
+    (3, 15),
+    (15, 3),
+    (15, 15),
+    (3, 9),
+    (9, 3),
+    (15, 9),
+    (9, 15),
+    (9, 9),
+];
+
 static COLOR32_LUT: &[Color32] = &[
     Color32::TRANSPARENT,
     Color32::BLACK,
@@ -53,29 +66,30 @@ impl UiBoard {
     }
 
     pub fn ui(&mut self, ui: &mut egui::Ui) {
-        let board_size_px = ui.available_size().min_elem();
+        let total_size = ui.available_size().min_elem();
 
         let (response, painter) = ui.allocate_painter(
             Vec2 {
-                x: board_size_px,
-                y: board_size_px,
+                x: total_size,
+                y: total_size,
             },
             egui::Sense::click(),
         );
         let rect = response.rect;
 
-        let n = self.size as f32;
-        let cell = rect.width() / (n - 1.0);
+        let cell = total_size / (self.size as f32);
+        let board_size = cell * ((self.size - 1) as f32);
 
         // --- draw grid ---
+        let board_left_top = rect.left_top() + egui::vec2(cell / 2.0, cell / 2.0);
         for i in 0..self.size {
-            let t = i as f32;
+            let i = i as f32;
 
             // vertical line
             painter.line_segment(
                 [
-                    rect.left_top() + egui::vec2(t * cell, 0.0),
-                    rect.left_top() + egui::vec2(t * cell, rect.height()),
+                    board_left_top + egui::vec2(i * cell, 0.0),
+                    board_left_top + egui::vec2(i * cell, board_size),
                 ],
                 egui::Stroke::new(1.0, egui::Color32::BLACK),
             );
@@ -83,8 +97,8 @@ impl UiBoard {
             // horizontal line
             painter.line_segment(
                 [
-                    rect.left_top() + egui::vec2(0.0, t * cell),
-                    rect.left_top() + egui::vec2(rect.width(), t * cell),
+                    board_left_top + egui::vec2(0.0, i * cell),
+                    board_left_top + egui::vec2(board_size, i * cell),
                 ],
                 egui::Stroke::new(1.0, egui::Color32::BLACK),
             );
@@ -94,19 +108,20 @@ impl UiBoard {
         if let Some(stone) = self.pending_move
             && response.clicked()
             && let Some(pos) = response.interact_pointer_pos()
-            && pos.x >= rect.min.x
-            && pos.y >= rect.min.y
         {
             // convert pixel → board coord
-            let local = pos - rect.min;
-            dbg!(cell, local);
+            let local = pos - board_left_top;
 
             let x = local.x / cell;
             let x_round = x.round();
             let y = local.y / cell;
             let y_round = y.round();
             const THRESH_PERCENT: f32 = 0.2; // 鼠标点击位置距离交叉点的阈值
-            if (x_round - x).abs() < THRESH_PERCENT && (y_round - y).abs() < THRESH_PERCENT {
+            if x >= -THRESH_PERCENT
+                && y >= -THRESH_PERCENT
+                && (x_round - x).abs() < THRESH_PERCENT
+                && (y_round - y).abs() < THRESH_PERCENT
+            {
                 let x = x_round as usize;
                 let y = y_round as usize;
                 if x < self.size && y < self.size {
@@ -125,7 +140,7 @@ impl UiBoard {
         }
 
         // --- draw stones ---
-        let radius = cell * 0.4;
+        let radius = cell * 0.35;
         let board = self.board.board_array();
 
         for y in 0..self.size {
@@ -133,7 +148,7 @@ impl UiBoard {
                 let idx = y * self.size + x;
                 let stone = board[idx];
                 if stone != Stone::VOID {
-                    let center = rect.left_top() + egui::vec2(x as f32 * cell, y as f32 * cell);
+                    let center = board_left_top + egui::vec2(x as f32 * cell, y as f32 * cell);
 
                     let color = COLOR32_LUT[stone.as_usize()];
 
@@ -145,6 +160,13 @@ impl UiBoard {
                         radius,
                         egui::Stroke::new(1.0, egui::Color32::BLACK),
                     );
+                } else {
+                    // --- draw star ---
+                    if self.size == 19 && STAR.contains(&(x, y)) {
+                        let center = board_left_top + egui::vec2(x as f32 * cell, y as f32 * cell);
+
+                        painter.circle_filled(center, cell / 10.0, Color32::BLACK);
+                    }
                 }
             }
         }
