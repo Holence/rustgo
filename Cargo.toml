@@ -4,6 +4,7 @@ members = [
     "crates/rustgo",
     "crates/gui",
     "crates/game",
+    "crates/server",
 ]
 
 [profile.release]
