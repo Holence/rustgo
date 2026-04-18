@@ -19,6 +19,8 @@ Server
   - 可以对接 内置的来自前端的用户交互
   - 可以对接 内置的 GoEngine
 
+![design](./assets/design.svg)
+
 # 阶段目标
 
 - [x] Board 中国规则棋盘，支持多色棋

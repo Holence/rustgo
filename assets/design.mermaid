@@ -1,0 +1,63 @@
+flowchart TB
+  subgraph server["Server"]
+      session_in["session_in"]
+      actors["actors"]
+      session_out["session_out"]
+  end
+  subgraph actors["Actors"]
+      lobby("Lobby")
+      room1("Room1")
+      room2("Room2")
+      router("Router")
+  end
+  subgraph session_in["Sessions"]
+      session1_in["Session1 In"]
+      session2_in["Session2 In"]
+      session3_in["Session3 In"]
+      session4_in["Session4 In"]
+      session5_in["Session5 In"]
+  end
+  subgraph session_out["Sessions"]
+      session1_out["Session1 Out"]
+      session2_out["Session2 Out"]
+      session3_out["Session3 Out"]
+      session4_out["Session4 Out"]
+      session5_out["Session5 Out"]
+  end
+  subgraph clients["Clients"]
+      client1("Client1")
+      client2("Client2")
+      client3("Client3")
+      client4("Client4")
+      client5("Client5")
+  end
+  router --> lobby & room1 & room2
+  client1 --> session1_in
+  client2 --> session2_in
+  client3 --> session3_in
+  client4 --> session4_in
+  client5 --> session5_in
+  session1_in --> router
+  session2_in --> router
+  session3_in --> router
+  session4_in --> router
+  session5_in --> router
+  session1_out --> client1
+  session2_out --> client2
+  session3_out --> client3
+  session4_out --> client4
+  session5_out --> client5
+  lobby --> session1_out
+  room1 --> session2_out & session3_out
+  room2 --> session4_out & session5_out
+
+  session1_in@{shape: card}
+  session2_in@{shape: card}
+  session3_in@{shape: card}
+  session4_in@{shape: card}
+  session5_in@{shape: card}
+  session1_out@{shape: card}
+  session2_out@{shape: card}
+  session3_out@{shape: card}
+  session4_out@{shape: card}
+  session5_out@{shape: card}
