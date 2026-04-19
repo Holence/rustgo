@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use tokio::sync::mpsc;
 
-use crate::common::{ClientId, DownlinkMessage};
+use crate::common::{ClientId, DownlinkMessage, RoomId};
 
 #[derive(Clone)]
 pub enum LobbyMessage {
@@ -14,6 +14,7 @@ pub enum LobbyMessage {
 pub struct LobbyActor {
     rx: mpsc::Receiver<LobbyMessage>,
     clients: HashMap<ClientId, mpsc::Sender<DownlinkMessage>>,
+    next_room_id: RoomId,
 }
 
 impl LobbyActor {
@@ -21,6 +22,7 @@ impl LobbyActor {
         Self {
             rx,
             clients: HashMap::new(),
+            next_room_id: 0,
         }
     }
 

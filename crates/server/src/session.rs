@@ -1,5 +1,5 @@
 use tokio::{
-    io::{AsyncBufReadExt, BufReader},
+    io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
     net::{
         TcpStream,
         tcp::{OwnedReadHalf, OwnedWriteHalf},
@@ -39,7 +39,7 @@ impl SessionActor {
         SessionActor { reader, writer }
     }
 
-    pub async fn run(self, router_tx: mpsc::Sender<RouterMessage>, session_id: SessionId) {
+    pub async fn run(mut self, router_tx: mpsc::Sender<RouterMessage>, session_id: SessionId) {
         println!("Session {} started", session_id);
         let mut lines = self.reader.lines();
 
@@ -56,19 +56,8 @@ impl SessionActor {
         // writer task
         let writer_task = tokio::spawn(async move {
             while let Some(msg) = rx.recv().await {
-                match msg {
-                    // ServerMessage::Text(text) => {
-                    //     let _ = writer.write_all(text.as_bytes()).await;
-                    //     let _ = writer.write_all(b"\n").await;
-                    // }
-                    DownlinkMessage::ServerGreeting(_) => todo!(),
-                    DownlinkMessage::ServerPingEcho => todo!(),
-                    DownlinkMessage::ServerShutdown => todo!(),
-                    DownlinkMessage::LobbyInfo(items) => todo!(),
-                    DownlinkMessage::LobbyChat(_, _) => todo!(),
-                    DownlinkMessage::RoomCreateAck(_) => todo!(),
-                    DownlinkMessage::RoomChat(_, _) => todo!(),
-                }
+                let msg = serde_json::to_string(&msg).unwrap();
+                self.writer.write_all(msg.as_bytes()).await.unwrap();
             }
         });
 

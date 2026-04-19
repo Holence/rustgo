@@ -1,4 +1,5 @@
 use rustgo::{Coord, Stone};
+use serde::{Deserialize, Serialize};
 
 pub type SessionId = u64;
 pub type ClientId = u64;
@@ -11,7 +12,7 @@ pub enum Action {
     Resign,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub enum DownlinkMessage {
     ServerGreeting(ClientId), // give client a unique ID
     ServerPingEcho,           // response to client Ping

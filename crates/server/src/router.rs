@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use tokio::sync::mpsc;
 
 use crate::{
-    common::{RoomId, SessionId, UplinkMessage},
+    common::{ClientId, RoomId, SessionId, UplinkMessage},
     lobby::LobbyMessage,
     room::RoomMessage,
     session::SessionActorTx,
@@ -26,9 +26,9 @@ pub enum RouterMessage {
 pub struct RouterActor {
     rx: mpsc::Receiver<RouterMessage>, // [SessionActor, ...] -> RouterActor
     lobby_tx: mpsc::Sender<LobbyMessage>, // RouterActor -> LobbyActor
-    sessions: HashMap<SessionId, SessionActorTx>, // RouterActor -> [SessionActor, ...]
-    rooms: HashMap<RoomId, mpsc::Sender<RoomMessage>>, // RouterActor -> [RoomActor, ...]
-    next_room_id: RoomId,
+    rooms_tx: HashMap<RoomId, mpsc::Sender<RoomMessage>>, // RouterActor -> [RoomActor, ...]
+    sessions_tx: HashMap<SessionId, SessionActorTx>, // RouterActor -> [SessionActor, ...]
+    next_client_id: ClientId,
 }
 
 impl RouterActor {
@@ -36,9 +36,9 @@ impl RouterActor {
         Self {
             rx,
             lobby_tx,
-            sessions: HashMap::new(),
-            rooms: HashMap::new(),
-            next_room_id: 0,
+            rooms_tx: HashMap::new(),
+            sessions_tx: HashMap::new(),
+            next_client_id: 0,
         }
     }
 
@@ -49,10 +49,17 @@ impl RouterActor {
                     session_id,
                     session_tx,
                 } => {
-                    self.sessions.insert(session_id, session_tx);
+                    session_tx
+                        .send(crate::common::DownlinkMessage::ServerGreeting(
+                            self.next_client_id,
+                        ))
+                        .await
+                        .unwrap();
+                    self.next_client_id += 1;
+                    self.sessions_tx.insert(session_id, session_tx);
                 }
                 RouterMessage::UnregisterSession { session_id } => {
-                    self.sessions.remove(&session_id);
+                    self.sessions_tx.remove(&session_id);
                 }
                 RouterMessage::ClientMessage { session_id, msg } => match msg {
                     UplinkMessage::Ping(_) => todo!(),

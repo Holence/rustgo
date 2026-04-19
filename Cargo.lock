@@ -2409,6 +2409,8 @@ name = "server"
 version = "0.1.0"
 dependencies = [
  "rustgo",
+ "serde",
+ "serde_json",
  "tokio",
 ]
 
