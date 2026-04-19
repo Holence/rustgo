@@ -9,6 +9,7 @@ use crate::{
     session::SessionActorTx,
 };
 
+#[derive(Debug)]
 pub enum RouterMessage {
     RegisterSession {
         session_id: SessionId,
@@ -44,6 +45,7 @@ impl RouterActor {
 
     pub async fn run(mut self) {
         while let Some(msg) = self.rx.recv().await {
+            dbg!(&msg);
             match msg {
                 RouterMessage::RegisterSession {
                     session_id,
@@ -53,6 +55,10 @@ impl RouterActor {
                         .send(crate::common::DownlinkMessage::ServerGreeting(
                             self.next_client_id,
                         ))
+                        .await
+                        .unwrap();
+                    self.lobby_tx
+                        .send(LobbyMessage::Enter(self.next_client_id, session_tx.clone()))
                         .await
                         .unwrap();
                     self.next_client_id += 1;
@@ -65,10 +71,15 @@ impl RouterActor {
                     UplinkMessage::Ping(_) => todo!(),
                     UplinkMessage::Quit(_) => todo!(),
                     UplinkMessage::LobbyEnter(_) => todo!(),
-                    UplinkMessage::LobbyChat(_) => todo!(),
+                    UplinkMessage::LobbyChat(client_id, s) => {
+                        self.lobby_tx
+                            .send(LobbyMessage::Chat(client_id, s))
+                            .await
+                            .unwrap();
+                    }
                     UplinkMessage::RoomCreate(_) => todo!(),
                     UplinkMessage::RoomEnter(_) => todo!(),
-                    UplinkMessage::RoomChat(_) => todo!(),
+                    UplinkMessage::RoomChat(_, _) => todo!(),
                     UplinkMessage::RoomQuit(_) => todo!(),
                 },
             }

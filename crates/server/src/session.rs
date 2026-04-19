@@ -15,18 +15,6 @@ use crate::{
 pub type SessionActorRx = mpsc::Receiver<UplinkMessage>;
 pub type SessionActorTx = mpsc::Sender<DownlinkMessage>;
 
-fn parse_command(line: String) -> Option<UplinkMessage> {
-    let parts: Vec<_> = line.splitn(3, ' ').collect();
-
-    match parts.as_slice() {
-        ["chat", msg] => Some(UplinkMessage::LobbyChat((*msg).into())),
-        _ => {
-            dbg!(line);
-            None
-        }
-    }
-}
-
 pub struct SessionActor {
     reader: BufReader<OwnedReadHalf>,
     writer: OwnedWriteHalf,
@@ -63,10 +51,15 @@ impl SessionActor {
 
         // reader loop
         while let Ok(Some(line)) = lines.next_line().await {
-            if let Some(msg) = parse_command(line) {
-                let _ = router_tx
-                    .send(RouterMessage::ClientMessage { session_id, msg })
-                    .await;
+            match serde_json::from_str::<UplinkMessage>(&line) {
+                Ok(msg) => {
+                    let _ = router_tx
+                        .send(RouterMessage::ClientMessage { session_id, msg })
+                        .await;
+                }
+                Err(err) => {
+                    eprintln!("Session {session_id} parse uplink error: {err}");
+                }
             }
         }
 

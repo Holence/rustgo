@@ -39,7 +39,7 @@ impl LobbyActor {
                     println!("[lobby] hear client[{}] says '{}'", client_id, s);
                     let msg = DownlinkMessage::LobbyChat(client_id, s);
                     for tx in self.clients.values() {
-                        let _ = tx.send(msg.clone()).await;
+                        tx.send(msg.clone()).await.unwrap();
                     }
                 }
             }

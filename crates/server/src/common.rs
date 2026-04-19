@@ -12,7 +12,7 @@ pub enum Action {
     Resign,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum DownlinkMessage {
     ServerGreeting(ClientId), // give client a unique ID
     ServerPingEcho,           // response to client Ping
@@ -26,16 +26,17 @@ pub enum DownlinkMessage {
     RoomChat(ClientId, String),
 }
 
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum UplinkMessage {
     Ping(ClientId), // Ping then wait for PingEcho, to calculate latency
     Quit(ClientId), // client shutdown
 
     LobbyEnter(ClientId),
-    LobbyChat(String),
+    LobbyChat(ClientId, String),
 
     RoomCreate(ClientId),
     RoomEnter(ClientId),
-    RoomChat(String),
+    RoomChat(ClientId, String),
     // LobbyCreateTeam(ClientId),
     RoomQuit(ClientId),
 }
