@@ -29,6 +29,8 @@ Server
 - [x] `Server = Game + Vec<TeamHandle<Vec<PlayerHandle>>>`，用channel传递ServerMessage/PlayerMessage
 - [x] 简易的 egui 界面，可以展示多色棋组队对战效果
 - [ ] Server搭建Actor Model，模拟PlayerMessage流入Lobby/Room/Game后的处理
+- [ ] client上传事件后需要等server返回ack，gui里的state为pending
+- [ ] 进入Room后ack当前完整状态, 后续的状态更新, 返回 update info (add/remove)
 - [ ] GUI Client实现Lobby/Room/Game
 - [ ] Server支持TCP连接
 - [ ] ...
