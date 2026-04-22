@@ -27,16 +27,28 @@ pub enum DownlinkMessage {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
-pub enum UplinkMessage {
-    Ping(ClientId), // Ping then wait for PingEcho, to calculate latency
-    Quit(ClientId), // client shutdown
+pub enum UplinkLobbyMessage {
+    Enter,
+    Chat { content: String },
+}
 
-    LobbyEnter(ClientId),
-    LobbyChat(ClientId, String),
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub enum UplinkRoomMessage {
+    Create,
+    Enter { room_id: RoomId },
+    Chat { room_id: RoomId, content: String },
+    Quit { room_id: RoomId },
+}
 
-    RoomCreate(ClientId),
-    RoomEnter(ClientId),
-    RoomChat(ClientId, String),
-    // LobbyCreateTeam(ClientId),
-    RoomQuit(ClientId),
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub enum UplinkMessageValue {
+    Ping,
+    Quit,
+    Lobby(UplinkLobbyMessage),
+    Room(UplinkRoomMessage),
+}
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct UplinkMessage {
+    pub client_id: ClientId,
+    pub msg: UplinkMessageValue,
 }

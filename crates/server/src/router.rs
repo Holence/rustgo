@@ -4,7 +4,7 @@ use log::error;
 use tokio::sync::mpsc;
 
 use crate::{
-    common::{ClientId, RoomId, SessionId, UplinkMessage},
+    common::{ClientId, RoomId, SessionId, UplinkLobbyMessage, UplinkMessage, UplinkMessageValue},
     lobby::LobbyMessage,
     room::RoomMessage,
     session::SessionActorTx,
@@ -64,30 +64,32 @@ impl RouterActor {
                 RouterMessage::UnregisterSession { session_id } => {
                     self.sessions_tx.remove(&session_id);
                 }
-                RouterMessage::ClientMessage { session_id, msg } => match msg {
-                    UplinkMessage::Ping(_) => todo!(),
-                    UplinkMessage::Quit(_) => todo!(),
-                    UplinkMessage::LobbyEnter(client_id) => {
-                        if let Some(tx) = self.sessions_tx.get(&client_id) {
-                            self.lobby_tx
-                                .send(LobbyMessage::Enter(self.next_client_id, tx.clone()))
-                                .await
-                                .unwrap();
-                        } else {
-                            error!("client_id {} not exist", client_id);
+                RouterMessage::ClientMessage { session_id, msg } => {
+                    let client_id = msg.client_id;
+                    if let Some(tx) = self.sessions_tx.get(&client_id) {
+                        match msg.msg {
+                            UplinkMessageValue::Ping => todo!(),
+                            UplinkMessageValue::Quit => todo!(),
+                            UplinkMessageValue::Lobby(lobby_message) => match lobby_message {
+                                UplinkLobbyMessage::Enter => {
+                                    self.lobby_tx
+                                        .send(LobbyMessage::Enter(self.next_client_id, tx.clone()))
+                                        .await
+                                        .unwrap();
+                                }
+                                UplinkLobbyMessage::Chat { content } => {
+                                    self.lobby_tx
+                                        .send(LobbyMessage::Chat(client_id, content))
+                                        .await
+                                        .unwrap();
+                                }
+                            },
+                            UplinkMessageValue::Room(room_message) => todo!(),
                         }
+                    } else {
+                        error!("client_id {} not exist", client_id);
                     }
-                    UplinkMessage::LobbyChat(client_id, s) => {
-                        self.lobby_tx
-                            .send(LobbyMessage::Chat(client_id, s))
-                            .await
-                            .unwrap();
-                    }
-                    UplinkMessage::RoomCreate(_) => todo!(),
-                    UplinkMessage::RoomEnter(_) => todo!(),
-                    UplinkMessage::RoomChat(_, _) => todo!(),
-                    UplinkMessage::RoomQuit(_) => todo!(),
-                },
+                }
             }
         }
     }
