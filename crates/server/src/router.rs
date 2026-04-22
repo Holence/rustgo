@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use log::error;
 use tokio::sync::mpsc;
 
 use crate::{
@@ -57,10 +58,6 @@ impl RouterActor {
                         ))
                         .await
                         .unwrap();
-                    self.lobby_tx
-                        .send(LobbyMessage::Enter(self.next_client_id, session_tx.clone()))
-                        .await
-                        .unwrap();
                     self.next_client_id += 1;
                     self.sessions_tx.insert(session_id, session_tx);
                 }
@@ -70,7 +67,16 @@ impl RouterActor {
                 RouterMessage::ClientMessage { session_id, msg } => match msg {
                     UplinkMessage::Ping(_) => todo!(),
                     UplinkMessage::Quit(_) => todo!(),
-                    UplinkMessage::LobbyEnter(_) => todo!(),
+                    UplinkMessage::LobbyEnter(client_id) => {
+                        if let Some(tx) = self.sessions_tx.get(&client_id) {
+                            self.lobby_tx
+                                .send(LobbyMessage::Enter(self.next_client_id, tx.clone()))
+                                .await
+                                .unwrap();
+                        } else {
+                            error!("client_id {} not exist", client_id);
+                        }
+                    }
                     UplinkMessage::LobbyChat(client_id, s) => {
                         self.lobby_tx
                             .send(LobbyMessage::Chat(client_id, s))

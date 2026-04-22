@@ -1,10 +1,29 @@
+use log::info;
 use server::{common::SessionId, lobby::LobbyActor, router::RouterActor, session::SessionActor};
 use tokio::{net::TcpListener, sync::mpsc};
 
 #[tokio::main]
 async fn main() {
+    env_logger::Builder::from_default_env()
+        .format(|buf, record| {
+            let ts = buf.timestamp();
+            let style = buf.default_level_style(record.level());
+
+            use std::io::Write;
+            writeln!(
+                buf,
+                "[{} {style}{:<5}{style:#} {}:{}] {}",
+                ts,
+                record.level(),
+                record.file().unwrap(),
+                record.line().unwrap(),
+                record.args()
+            )
+        })
+        .init();
+
     let listener = TcpListener::bind("0.0.0.0:8080").await.unwrap();
-    println!("Server running on 8080");
+    info!("Server running on 8080");
 
     let (lobby_tx, lobby_rx) = mpsc::channel(32);
     let lobby_actor = LobbyActor::new(lobby_rx);
