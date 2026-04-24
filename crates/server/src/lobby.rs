@@ -1,12 +1,19 @@
 use std::collections::HashMap;
 
+use log::{error, info};
 use tokio::sync::mpsc;
 
-use crate::common::{ClientId, DownlinkMessage, RoomId};
+use crate::common::{
+    ClientId, DownlinkLobbyMessage, DownlinkMessage, DownlinkMessageValue, ReqId, RoomId,
+};
 
 #[derive(Clone)]
 pub enum LobbyMessage {
-    Enter(ClientId, mpsc::Sender<DownlinkMessage>),
+    Enter {
+        client_id: ClientId,
+        req_id: ReqId,
+        tx: mpsc::Sender<DownlinkMessage>,
+    },
     Chat(ClientId, String),
     Quit(ClientId),
 }
@@ -26,18 +33,45 @@ impl LobbyActor {
         }
     }
 
+    async fn send_to_session(&self, client_id: ClientId, msg: DownlinkMessage) {
+        if let Some(tx) = self.clients.get(&client_id) {
+            tx.send(msg).await.unwrap();
+        } else {
+            error!("client {client_id} not exist");
+        }
+    }
     pub async fn run(mut self) {
         while let Some(msg) = self.rx.recv().await {
             match msg {
-                LobbyMessage::Enter(client_id, tx) => {
+                LobbyMessage::Enter {
+                    client_id,
+                    req_id,
+                    tx,
+                } => {
                     self.clients.insert(client_id, tx);
+                    self.send_to_session(
+                        client_id,
+                        DownlinkMessage {
+                            req_id,
+                            msg: DownlinkMessageValue::Lobby(DownlinkLobbyMessage::EnterAck {
+                                success: true,
+                            }),
+                        },
+                    )
+                    .await;
                 }
                 LobbyMessage::Quit(client_id) => {
                     self.clients.remove(&client_id);
                 }
                 LobbyMessage::Chat(client_id, s) => {
-                    println!("[lobby] hear client[{}] says '{}'", client_id, s);
-                    let msg = DownlinkMessage::LobbyChat(client_id, s);
+                    info!("hear client[{}] says '{}'", client_id, s);
+                    let msg = DownlinkMessage {
+                        req_id: 0,
+                        msg: DownlinkMessageValue::Lobby(DownlinkLobbyMessage::Chat {
+                            client_id,
+                            content: s,
+                        }),
+                    };
                     for tx in self.clients.values() {
                         tx.send(msg.clone()).await.unwrap();
                     }

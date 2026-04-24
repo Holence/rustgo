@@ -1,3 +1,4 @@
+use log::{info, log};
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
     net::{
@@ -28,7 +29,7 @@ impl SessionActor {
     }
 
     pub async fn run(mut self, router_tx: mpsc::Sender<RouterMessage>, session_id: SessionId) {
-        println!("Session {} started", session_id);
+        info!("[{session_id}] started");
         let mut lines = self.reader.lines();
 
         let (tx, mut rx) = mpsc::channel(32);
@@ -45,12 +46,15 @@ impl SessionActor {
         let writer_task = tokio::spawn(async move {
             while let Some(msg) = rx.recv().await {
                 let msg = serde_json::to_string(&msg).unwrap();
+                info!("[{session_id}] write {msg}");
                 self.writer.write_all(msg.as_bytes()).await.unwrap();
+                self.writer.write_all(b"\n").await.unwrap();
             }
         });
 
         // reader loop
         while let Ok(Some(line)) = lines.next_line().await {
+            info!("[{session_id}] read {line}");
             match serde_json::from_str::<UplinkMessage>(&line) {
                 Ok(msg) => {
                     let _ = router_tx

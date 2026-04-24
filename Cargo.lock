@@ -1144,6 +1144,9 @@ dependencies = [
  "eframe",
  "game",
  "rustgo",
+ "serde",
+ "serde_json",
+ "server",
  "tokio",
 ]
 
