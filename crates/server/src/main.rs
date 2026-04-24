@@ -1,5 +1,5 @@
 use log::info;
-use server::{common::SessionId, lobby::LobbyActor, router::RouterActor, session::SessionActor};
+use server::{lobby::LobbyActor, router::RouterActor, session::SessionActor};
 use tokio::{net::TcpListener, sync::mpsc};
 
 #[tokio::main]
@@ -33,11 +33,10 @@ async fn main() {
     let router_actor = RouterActor::new(router_rx, lobby_tx);
     tokio::spawn(router_actor.run());
 
-    let mut session_id: SessionId = 0;
     loop {
-        let (stream, _) = listener.accept().await.unwrap();
+        let (stream, addr) = listener.accept().await.unwrap();
+        info!("{} connected", addr);
         let session_actor = SessionActor::new(stream);
-        tokio::spawn(session_actor.run(router_tx.clone(), session_id));
-        session_id += 1;
+        tokio::spawn(session_actor.run(router_tx.clone()));
     }
 }

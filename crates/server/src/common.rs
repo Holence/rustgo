@@ -1,7 +1,6 @@
 use rustgo::{Coord, Stone};
 use serde::{Deserialize, Serialize};
 
-pub type SessionId = u64;
 pub type ClientId = u64;
 pub type RoomId = u64;
 pub type ReqId = u64;

@@ -10,3 +10,11 @@ rustgo = { path = "../rustgo" }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
 tokio = { version = "1.51.1", features = ["full"] }
+
+[lints.rust]
+unused_must_use = "deny"
+
+[lints.clippy]
+needless_return = "allow"
+redundant_field_names = "allow"
+collapsible_else_if = "allow"

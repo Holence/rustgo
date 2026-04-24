@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 
 use log::error;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, oneshot};
 
 use crate::{
     common::{
-        ClientId, DownlinkMessage, DownlinkMessageValue, RoomId, SessionId, UplinkLobbyMessage,
-        UplinkMessage, UplinkMessageValue,
+        ClientId, DownlinkMessage, DownlinkMessageValue, RoomId, UplinkLobbyMessage, UplinkMessage,
+        UplinkMessageValue,
     },
     lobby::LobbyMessage,
     room::RoomMessage,
@@ -16,14 +16,13 @@ use crate::{
 #[derive(Debug)]
 pub enum RouterMessage {
     RegisterSession {
-        session_id: SessionId,
+        client_id_tx: oneshot::Sender<ClientId>,
         session_tx: SessionActorTx,
     },
     UnregisterSession {
-        session_id: SessionId,
+        client_id: ClientId,
     },
     ClientMessage {
-        session_id: SessionId,
         msg: UplinkMessage,
     },
 }
@@ -32,7 +31,7 @@ pub struct RouterActor {
     rx: mpsc::Receiver<RouterMessage>, // [SessionActor, ...] -> RouterActor
     lobby_tx: mpsc::Sender<LobbyMessage>, // RouterActor -> LobbyActor
     rooms_tx: HashMap<RoomId, mpsc::Sender<RoomMessage>>, // RouterActor -> [RoomActor, ...]
-    sessions_tx: HashMap<SessionId, SessionActorTx>, // RouterActor -> [SessionActor, ...]
+    sessions_tx: HashMap<ClientId, SessionActorTx>, // RouterActor -> [SessionActor, ...]
     next_client_id: ClientId,
 }
 
@@ -47,11 +46,11 @@ impl RouterActor {
         }
     }
 
-    async fn send_to_session(&self, session_id: SessionId, msg: DownlinkMessage) {
-        if let Some(tx) = self.sessions_tx.get(&session_id) {
+    async fn send_to_session(&self, client_id: ClientId, msg: DownlinkMessage) {
+        if let Some(tx) = self.sessions_tx.get(&client_id) {
             tx.send(msg).await.unwrap();
         } else {
-            error!("session[{session_id}] not exist");
+            error!("session[{client_id}] not exist");
         }
     }
 
@@ -71,26 +70,28 @@ impl RouterActor {
         while let Some(msg) = self.rx.recv().await {
             match msg {
                 RouterMessage::RegisterSession {
-                    session_id,
+                    client_id_tx,
                     session_tx,
                 } => {
-                    self.sessions_tx.insert(session_id, session_tx);
+                    let client_id = self.next_client_id;
+                    self.sessions_tx.insert(client_id, session_tx);
 
+                    client_id_tx.send(client_id).unwrap();
                     self.send_to_session(
-                        session_id,
+                        client_id,
                         DownlinkMessage {
                             req_id: 0,
-                            msg: DownlinkMessageValue::Greeting(self.next_client_id),
+                            msg: DownlinkMessageValue::Greeting(client_id),
                         },
                     )
                     .await;
 
                     self.next_client_id += 1;
                 }
-                RouterMessage::UnregisterSession { session_id } => {
-                    self.sessions_tx.remove(&session_id);
+                RouterMessage::UnregisterSession { client_id } => {
+                    self.sessions_tx.remove(&client_id);
                 }
-                RouterMessage::ClientMessage { session_id, msg } => {
+                RouterMessage::ClientMessage { msg } => {
                     let client_id = msg.client_id;
                     let req_id = msg.req_id;
                     if let Some(tx) = self.sessions_tx.get(&client_id) {
