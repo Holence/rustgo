@@ -14,8 +14,13 @@ pub enum LobbyMessage {
         req_id: ReqId,
         tx: mpsc::Sender<DownlinkMessage>,
     },
-    Chat(ClientId, String),
-    Quit(ClientId),
+    Chat {
+        client_id: ClientId,
+        content: String,
+    },
+    Quit {
+        client_id: ClientId,
+    },
 }
 
 pub struct LobbyActor {
@@ -60,16 +65,16 @@ impl LobbyActor {
                     )
                     .await;
                 }
-                LobbyMessage::Quit(client_id) => {
+                LobbyMessage::Quit { client_id } => {
                     self.clients.remove(&client_id);
                 }
-                LobbyMessage::Chat(client_id, s) => {
-                    info!("hear client[{}] says '{}'", client_id, s);
+                LobbyMessage::Chat { client_id, content } => {
+                    info!("hear client[{}] says '{}'", client_id, content);
                     let msg = DownlinkMessage {
                         req_id: 0,
                         msg: DownlinkMessageValue::Lobby(DownlinkLobbyMessage::Chat {
                             client_id,
-                            content: s,
+                            content,
                         }),
                     };
                     for tx in self.clients.values() {

@@ -27,11 +27,16 @@ pub enum RouterMessage {
     },
 }
 
+enum ClientLocation {
+    AtLobby,
+    AtRoom(RoomId),
+}
 pub struct RouterActor {
     rx: mpsc::Receiver<RouterMessage>, // [SessionActor, ...] -> RouterActor
     lobby_tx: mpsc::Sender<LobbyMessage>, // RouterActor -> LobbyActor
     rooms_tx: HashMap<RoomId, mpsc::Sender<RoomMessage>>, // RouterActor -> [RoomActor, ...]
     sessions_tx: HashMap<ClientId, SessionActorTx>, // RouterActor -> [SessionActor, ...]
+    clients_location: HashMap<ClientId, ClientLocation>,
     next_client_id: ClientId,
 }
 
@@ -42,6 +47,7 @@ impl RouterActor {
             lobby_tx,
             rooms_tx: HashMap::new(),
             sessions_tx: HashMap::new(),
+            clients_location: HashMap::new(),
             next_client_id: 0,
         }
     }
@@ -90,6 +96,14 @@ impl RouterActor {
                 }
                 RouterMessage::UnregisterSession { client_id } => {
                     self.sessions_tx.remove(&client_id);
+                    if let Some(location) = self.clients_location.get(&client_id) {
+                        match location {
+                            ClientLocation::AtLobby => {
+                                self.send_to_lobby(LobbyMessage::Quit { client_id }).await;
+                            }
+                            ClientLocation::AtRoom(_) => todo!(),
+                        }
+                    }
                 }
                 RouterMessage::ClientMessage { msg } => {
                     let client_id = msg.client_id;
@@ -100,15 +114,26 @@ impl RouterActor {
                             UplinkMessageValue::Quit => todo!(),
                             UplinkMessageValue::Lobby(lobby_message) => match lobby_message {
                                 UplinkLobbyMessage::Enter => {
-                                    self.send_to_lobby(LobbyMessage::Enter {
-                                        client_id,
-                                        req_id,
-                                        tx: tx.clone(),
-                                    })
-                                    .await;
+                                    if let Some(location) = self.clients_location.get(&client_id) {
+                                        match location {
+                                            ClientLocation::AtLobby => {
+                                                error!("client[{}] already at lobby", client_id);
+                                            }
+                                            ClientLocation::AtRoom(_) => todo!(),
+                                        }
+                                    } else {
+                                        self.send_to_lobby(LobbyMessage::Enter {
+                                            client_id,
+                                            req_id,
+                                            tx: tx.clone(),
+                                        })
+                                        .await;
+                                        self.clients_location
+                                            .insert(client_id, ClientLocation::AtLobby);
+                                    }
                                 }
                                 UplinkLobbyMessage::Chat { content } => {
-                                    self.send_to_lobby(LobbyMessage::Chat(client_id, content))
+                                    self.send_to_lobby(LobbyMessage::Chat { client_id, content })
                                         .await;
                                 }
                                 UplinkLobbyMessage::CreateRoom => todo!(),
