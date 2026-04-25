@@ -46,10 +46,10 @@ pub async fn network_task(
                         // GUI ask to connect
                         NetworkTaskCmd::Connect => match TcpStream::connect(&addr).await {
                             Ok(stream) => {
-                                let (r, w) = stream.into_split();
+                                let (reader, writer) = stream.into_split();
                                 state = State::Connected {
-                                    writer: w,
-                                    lines: BufReader::new(r).lines(),
+                                    writer,
+                                    lines: BufReader::new(reader).lines(),
                                 };
                                 tx_msg.send(NetworkTaskEvent::Connected).unwrap();
                                 break;

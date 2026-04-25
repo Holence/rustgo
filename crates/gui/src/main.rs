@@ -66,6 +66,11 @@ impl App {
         id
     }
 
+    fn change_state(&mut self, state: ViewState) {
+        self.state = state;
+        self.pending = None;
+    }
+
     fn send(&mut self, msg: UplinkMessage, desc: &str) {
         self.pending = Some(Pending {
             req_id: msg.req_id,
@@ -94,7 +99,7 @@ impl App {
         while let Ok(event) = self.rx_msg.try_recv() {
             match event {
                 NetworkTaskEvent::Connected => {
-                    self.state = ViewState::GoingToLobby;
+                    self.change_state(ViewState::GoingToLobby);
                     break;
                 }
                 _ => unreachable!("{:?}", event),
@@ -117,7 +122,7 @@ impl App {
         while let Ok(event) = self.rx_msg.try_recv() {
             match event {
                 NetworkTaskEvent::Disconnected => {
-                    self.state = ViewState::Home;
+                    self.change_state(ViewState::Home);
                     break;
                 }
                 NetworkTaskEvent::Recv(downlink_message) => {
@@ -143,7 +148,9 @@ impl App {
                                     if self.pending_matches(req_id) {
                                         self.pending = None;
                                         if success {
-                                            self.state = ViewState::Lobby(LobbyState::default());
+                                            self.change_state(ViewState::Lobby(
+                                                LobbyState::default(),
+                                            ));
                                             break;
                                         }
                                     }
@@ -173,7 +180,7 @@ impl App {
         while let Ok(event) = self.rx_msg.try_recv() {
             match event {
                 NetworkTaskEvent::Disconnected => {
-                    self.state = ViewState::Home;
+                    self.change_state(ViewState::Home);
                     break;
                 }
                 NetworkTaskEvent::Recv(downlink_message) => {
