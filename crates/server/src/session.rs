@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use log::{error, info, log};
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
@@ -6,6 +8,7 @@ use tokio::{
         tcp::{OwnedReadHalf, OwnedWriteHalf},
     },
     sync::{mpsc, oneshot},
+    time::sleep,
 };
 
 use crate::{
@@ -52,6 +55,7 @@ impl SessionActor {
         // writer task
         let writer_task = tokio::spawn(async move {
             while let Some(msg) = session_rx.recv().await {
+                sleep(Duration::from_secs(1)).await;
                 let msg = serde_json::to_string(&msg).unwrap();
                 info!("[{}] write {msg}", self.client_id);
                 self.writer.write_all(msg.as_bytes()).await.unwrap();
@@ -64,17 +68,11 @@ impl SessionActor {
             info!("[{}] read {line}", self.client_id);
             match serde_json::from_str::<UplinkMessage>(&line) {
                 Ok(msg) => {
-                    if msg.client_id != self.client_id {
-                        error!(
-                            "[{}] client_id does not match: {}",
-                            self.client_id, msg.client_id
-                        );
-                    } else {
-                        router_tx
-                            .send(RouterMessage::ClientMessage { msg })
-                            .await
-                            .unwrap();
-                    }
+                    // TODO some check and filter for malicious package?
+                    router_tx
+                        .send(RouterMessage::ClientMessage { msg })
+                        .await
+                        .unwrap();
                 }
                 Err(err) => {
                     eprintln!("[{}] parse uplink error: {err}", self.client_id);

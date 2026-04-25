@@ -71,12 +71,7 @@ impl App {
         self.pending = None;
     }
 
-    fn send(&mut self, msg: UplinkMessage, desc: &str) {
-        self.pending = Some(Pending {
-            req_id: msg.req_id,
-            description: desc.to_string(),
-        });
-
+    fn send(&mut self, msg: UplinkMessage) {
         self.tx_cmd.send(NetworkTaskCmd::Send(msg)).unwrap();
     }
 
@@ -131,16 +126,11 @@ impl App {
                         server::common::DownlinkMessageValue::Greeting(client_id) => {
                             self.client_id = Some(client_id);
                             let req_id = self.next_req();
-                            self.send(
-                                UplinkMessage {
-                                    client_id,
-                                    req_id,
-                                    msg: server::common::UplinkMessageValue::Lobby(
-                                        server::common::UplinkLobbyMessage::Enter,
-                                    ),
-                                },
-                                "Enter Lobby",
-                            );
+                            self.pending = Some(Pending {
+                                req_id,
+                                description: "Enter Lobby".to_string(),
+                            });
+                            self.send(UplinkMessage::LobbyEnter { client_id, req_id });
                         }
                         server::common::DownlinkMessageValue::Lobby(downlink_lobby_message) => {
                             match downlink_lobby_message {
@@ -280,18 +270,10 @@ impl eframe::App for App {
                 }
 
                 UiAction::SendLobbyChat(content) => {
-                    let req_id = self.next_req();
-
-                    self.send(
-                        UplinkMessage {
-                            client_id: self.client_id.unwrap(),
-                            req_id,
-                            msg: server::common::UplinkMessageValue::Lobby(
-                                server::common::UplinkLobbyMessage::Chat { content },
-                            ),
-                        },
-                        "Send LobbyChat",
-                    );
+                    self.send(UplinkMessage::LobbyChat {
+                        client_id: self.client_id.unwrap(),
+                        content,
+                    });
                 }
             }
         }

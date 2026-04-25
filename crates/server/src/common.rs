@@ -58,29 +58,39 @@ pub struct DownlinkMessage {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
-pub enum UplinkLobbyMessage {
-    Enter,
-    Chat { content: String },
-    CreateRoom,
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub enum UplinkRoomMessage {
-    Enter { room_id: RoomId },
-    Chat { room_id: RoomId, content: String },
-    Quit { room_id: RoomId },
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub enum UplinkMessageValue {
-    Ping,
-    Quit,
-    Lobby(UplinkLobbyMessage),
-    Room(UplinkRoomMessage),
-}
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct UplinkMessage {
-    pub client_id: ClientId,
-    pub req_id: ReqId,
-    pub msg: UplinkMessageValue,
+pub enum UplinkMessage {
+    Ping {
+        client_id: ClientId,
+        req_id: ReqId,
+    },
+    Quit {
+        client_id: ClientId,
+    },
+    LobbyEnter {
+        client_id: ClientId,
+        req_id: ReqId,
+    },
+    LobbyChat {
+        client_id: ClientId,
+        content: String,
+    },
+    LobbyCreateRoom {
+        client_id: ClientId,
+        req_id: ReqId,
+    },
+    RoomEnter {
+        client_id: ClientId,
+        req_id: ReqId,
+        room_id: RoomId,
+    },
+    RoomChat {
+        client_id: ClientId,
+        room_id: RoomId,
+        content: String,
+    },
+    RoomQuit {
+        client_id: ClientId,
+        req_id: ReqId,
+        room_id: RoomId,
+    },
 }

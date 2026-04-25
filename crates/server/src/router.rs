@@ -4,10 +4,7 @@ use log::error;
 use tokio::sync::{mpsc, oneshot};
 
 use crate::{
-    common::{
-        ClientId, DownlinkMessage, DownlinkMessageValue, RoomId, UplinkLobbyMessage, UplinkMessage,
-        UplinkMessageValue,
-    },
+    common::{ClientId, DownlinkMessage, DownlinkMessageValue, RoomId, UplinkMessage},
     lobby::LobbyMessage,
     room::RoomMessage,
     session::SessionActorTx,
@@ -106,43 +103,69 @@ impl RouterActor {
                     }
                 }
                 RouterMessage::ClientMessage { msg } => {
-                    let client_id = msg.client_id;
-                    let req_id = msg.req_id;
-                    if let Some(tx) = self.sessions_tx.get(&client_id) {
-                        match msg.msg {
-                            UplinkMessageValue::Ping => todo!(),
-                            UplinkMessageValue::Quit => todo!(),
-                            UplinkMessageValue::Lobby(lobby_message) => match lobby_message {
-                                UplinkLobbyMessage::Enter => {
-                                    if let Some(location) = self.clients_location.get(&client_id) {
-                                        match location {
-                                            ClientLocation::AtLobby => {
-                                                error!("client[{}] already at lobby", client_id);
-                                            }
-                                            ClientLocation::AtRoom(_) => todo!(),
-                                        }
-                                    } else {
-                                        self.send_to_lobby(LobbyMessage::Enter {
-                                            client_id,
-                                            req_id,
-                                            tx: tx.clone(),
-                                        })
-                                        .await;
-                                        self.clients_location
-                                            .insert(client_id, ClientLocation::AtLobby);
+                    match msg {
+                        UplinkMessage::Ping { client_id, req_id } => todo!(),
+                        UplinkMessage::Quit { client_id } => todo!(),
+                        UplinkMessage::LobbyEnter { client_id, req_id } => {
+                            if let Some(location) = self.clients_location.get(&client_id) {
+                                match location {
+                                    ClientLocation::AtLobby => {
+                                        error!("client[{}] already at lobby", client_id);
                                     }
+                                    ClientLocation::AtRoom(_) => todo!(),
                                 }
-                                UplinkLobbyMessage::Chat { content } => {
-                                    self.send_to_lobby(LobbyMessage::Chat { client_id, content })
-                                        .await;
-                                }
-                                UplinkLobbyMessage::CreateRoom => todo!(),
-                            },
-                            UplinkMessageValue::Room(room_message) => todo!(),
+                            } else {
+                                self.send_to_lobby(LobbyMessage::Enter {
+                                    client_id,
+                                    req_id,
+                                    tx: self.sessions_tx.get(&client_id).unwrap().clone(),
+                                })
+                                .await;
+                                self.clients_location
+                                    .insert(client_id, ClientLocation::AtLobby);
+                            }
                         }
-                    } else {
-                        error!("client_id {} not exist", client_id);
+                        UplinkMessage::LobbyChat { client_id, content } => {
+                            self.send_to_lobby(LobbyMessage::Chat { client_id, content })
+                                .await;
+                        }
+                        UplinkMessage::LobbyCreateRoom { client_id, req_id } => todo!(),
+                        UplinkMessage::RoomEnter {
+                            client_id,
+                            req_id,
+                            room_id,
+                        } => todo!(),
+                        UplinkMessage::RoomChat {
+                            client_id,
+                            room_id,
+                            content,
+                        } => todo!(),
+                        UplinkMessage::RoomQuit {
+                            client_id,
+                            req_id,
+                            room_id,
+                        } => todo!(),
                     }
+                    // let client_id = msg.client_id;
+                    // let req_id = msg.req_id;
+                    // if let Some(tx) = self.sessions_tx.get(&client_id) {
+                    //     match msg.msg {
+                    //         UplinkMessageValue::Ping => todo!(),
+                    //         UplinkMessageValue::Quit => todo!(),
+                    //         UplinkMessageValue::Lobby(lobby_message) => match lobby_message {
+                    //             UplinkLobbyMessage::Enter => {
+                    //
+                    //             }
+                    //             UplinkLobbyMessage::Chat { content } => {
+                    //
+                    //             }
+                    //             UplinkLobbyMessage::CreateRoom => todo!(),
+                    //         },
+                    //         UplinkMessageValue::Room(room_message) => todo!(),
+                    //     }
+                    // } else {
+                    //     error!("client_id {} not exist", client_id);
+                    // }
                 }
             }
         }
