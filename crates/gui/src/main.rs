@@ -1,140 +1,20 @@
-use server::common::{ClientId, DownlinkMessage, ReqId, RoomId, UplinkMessage};
-use tokio::{
-    io::{AsyncBufReadExt, AsyncWriteExt, BufReader, Lines},
-    net::TcpStream,
-    sync::mpsc,
-};
+use gui::network_task::{NetworkTaskCmd, NetworkTaskEvent, network_task};
+use server::common::{ClientId, ReqId, RoomId, UplinkMessage};
+use std::fmt::Debug;
+use tokio::sync::mpsc;
 
 use eframe::egui;
 
-#[derive(Debug)]
-enum NetworkTaskCmd {
-    Connect,
-    Disconnect,
-    Send(UplinkMessage),
-}
-
-#[derive(Debug)]
-enum NetworkTaskEvent {
-    Connected,
-    Disconnected,
-    Recv(DownlinkMessage),
-}
-
-async fn network_task(
-    addr: String,
-    mut rx_cmd: mpsc::UnboundedReceiver<NetworkTaskCmd>,
-    tx_msg: mpsc::UnboundedSender<NetworkTaskEvent>,
-) -> Result<(), std::io::Error> {
-    use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
-
-    #[derive(Debug)]
-    enum State {
-        Disconnected,
-        Connected {
-            writer: OwnedWriteHalf,
-            lines: Lines<BufReader<OwnedReadHalf>>,
-        },
-    }
-
-    let mut state = State::Disconnected;
-
-    loop {
-        match &mut state {
-            State::Disconnected => {
-                // Only react to commands
-                while let Some(cmd) = rx_cmd.recv().await {
-                    match cmd {
-                        // GUI ask to connect
-                        NetworkTaskCmd::Connect => match TcpStream::connect(&addr).await {
-                            Ok(stream) => {
-                                let (r, w) = stream.into_split();
-                                state = State::Connected {
-                                    writer: w,
-                                    lines: BufReader::new(r).lines(),
-                                };
-                                tx_msg.send(NetworkTaskEvent::Connected).unwrap();
-                                break;
-                            }
-                            Err(e) => {
-                                eprintln!("connect failed: {e}");
-                            }
-                        },
-                        _ => {
-                            eprintln!("wrong event {:?} @ {:?}", cmd, state);
-                        }
-                    }
-                }
-            }
-
-            State::Connected { lines, writer } => {
-                tokio::select! {
-                    // Commands
-                    cmd = rx_cmd.recv() => {
-                        match cmd {
-                            Some(NetworkTaskCmd::Disconnect) => {
-                                // GUI ask to disconnect
-                                writer.shutdown().await.unwrap();
-                                state = State::Disconnected;
-                                tx_msg.send(NetworkTaskEvent::Disconnected).unwrap();
-                            }
-                            Some(NetworkTaskCmd::Send(msg)) => {
-                                // GUI ask to send message
-                                let json = serde_json::to_string(&msg)?;
-                                writer.write_all(json.as_bytes()).await?;
-                                writer.write_all(b"\n").await?;
-                            }
-                            Some(NetworkTaskCmd::Connect) => {
-                                eprintln!("wrong event {:?} @ {:?}", cmd, state);
-                            }
-                            None => break,
-                        }
-                    }
-
-                    // Socket read
-                    result = lines.next_line() => {
-                        match result {
-                            Ok(Some(s)) => {
-                                match serde_json::from_str::<DownlinkMessage>(&s) {
-                                    Ok(msg) => {
-                                        tx_msg.send(NetworkTaskEvent::Recv(msg)).unwrap();
-                                    }
-                                    Err(e) => {
-                                        eprintln!("invalid json: {e}, line={s}");
-                                    }
-                                }
-                            },
-                            Ok(None) => {
-                                eprintln!("server closed connection");
-                                state = State::Disconnected;
-                                tx_msg.send(NetworkTaskEvent::Disconnected).unwrap();
-                                continue;
-                            }
-                            Err(e) => {
-                                eprintln!("read error: {e}");
-                                state = State::Disconnected;
-                                tx_msg.send(NetworkTaskEvent::Disconnected).unwrap();
-                                continue;
-                            }
-                        }
-
-                    }
-                }
-            }
-        }
-    }
-
-    Ok(())
-}
-
 #[derive(Default, Debug, Clone)]
 struct LobbyState {
-    pub chat_input: String,
+    pub(crate) chat_input: String,
+    pub(crate) chat_log: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
 enum ViewState {
     Home,
+    GoingToLobby,
     Lobby(LobbyState),
     Room(RoomId),
 }
@@ -163,8 +43,6 @@ pub struct App {
 
     tx_cmd: mpsc::UnboundedSender<NetworkTaskCmd>,
     rx_msg: mpsc::UnboundedReceiver<NetworkTaskEvent>,
-
-    chat_log: Vec<String>,
 }
 
 impl App {
@@ -179,7 +57,6 @@ impl App {
             client_id: None,
             tx_cmd,
             rx_msg,
-            chat_log: vec![],
         }
     }
 
@@ -206,67 +83,149 @@ impl App {
         self.tx_cmd.send(NetworkTaskCmd::Disconnect).unwrap();
     }
 
-    fn handle_server_msg(&mut self, msg: DownlinkMessage) {
-        let req_id = msg.req_id;
-        match msg.msg {
-            server::common::DownlinkMessageValue::Greeting(client_id) => {
-                self.client_id = Some(client_id);
-                let req_id = self.next_req();
-                self.send(
-                    UplinkMessage {
-                        client_id,
-                        req_id,
-                        msg: server::common::UplinkMessageValue::Lobby(
-                            server::common::UplinkLobbyMessage::Enter,
-                        ),
-                    },
-                    "Enter Lobby",
-                );
-            }
-            server::common::DownlinkMessageValue::PingEcho => todo!(),
-            server::common::DownlinkMessageValue::Shutdown => todo!(),
-            server::common::DownlinkMessageValue::Lobby(downlink_lobby_message) => {
-                match downlink_lobby_message {
-                    server::common::DownlinkLobbyMessage::EnterAck { success } => {
-                        if self.pending_matches(req_id) {
-                            self.pending = None;
-                            if success {
-                                self.state = ViewState::Lobby(LobbyState::default());
-                            }
-                        }
-                    }
-                    server::common::DownlinkLobbyMessage::Chat { client_id, content } => {
-                        self.chat_log.push(format!("{client_id}: {content}"));
-                    }
+    fn pending_matches(&self, req_id: ReqId) -> bool {
+        if let Some(pending) = &self.pending {
+            return pending.req_id == req_id;
+        }
+        return false;
+    }
+
+    fn handle_home(&mut self) {
+        while let Ok(event) = self.rx_msg.try_recv() {
+            match event {
+                NetworkTaskEvent::Connected => {
+                    self.state = ViewState::GoingToLobby;
+                    break;
                 }
-            }
-            server::common::DownlinkMessageValue::Room(downlink_room_message) => {
-                match downlink_room_message {
-                    server::common::DownlinkRoomMessage::CreateAck { success, room_id } => todo!(),
-                    server::common::DownlinkRoomMessage::EnterAck { success, room_id } => {
-                        if self.pending_matches(req_id) {
-                            self.pending = None;
-                            if success {
-                                self.state = ViewState::Room(room_id);
-                            }
-                        }
-                    }
-                    server::common::DownlinkRoomMessage::Chat {
-                        room_id,
-                        client_id,
-                        content,
-                    } => todo!(),
-                    server::common::DownlinkRoomMessage::QuitAck => todo!(),
-                }
+                _ => unreachable!("{:?}", event),
             }
         }
     }
 
-    fn pending_matches(&self, req_id: ReqId) -> bool {
-        self.pending
-            .as_ref()
-            .map(|p| p.req_id == req_id)
-            .unwrap_or(false)
+    fn ui_home(&mut self, ui: &mut egui::Ui) -> Option<UiAction> {
+        let mut action: Option<UiAction> = None;
+        ui.heading("Home");
+        ui.separator();
+
+        if ui.button("Connect").clicked() {
+            action = Some(UiAction::Connect);
+        }
+        return action;
+    }
+
+    fn handle_going_to_lobby(&mut self) {
+        while let Ok(event) = self.rx_msg.try_recv() {
+            match event {
+                NetworkTaskEvent::Disconnected => {
+                    self.state = ViewState::Home;
+                    break;
+                }
+                NetworkTaskEvent::Recv(downlink_message) => {
+                    let req_id = downlink_message.req_id;
+                    match downlink_message.msg {
+                        server::common::DownlinkMessageValue::Greeting(client_id) => {
+                            self.client_id = Some(client_id);
+                            let req_id = self.next_req();
+                            self.send(
+                                UplinkMessage {
+                                    client_id,
+                                    req_id,
+                                    msg: server::common::UplinkMessageValue::Lobby(
+                                        server::common::UplinkLobbyMessage::Enter,
+                                    ),
+                                },
+                                "Enter Lobby",
+                            );
+                        }
+                        server::common::DownlinkMessageValue::Lobby(downlink_lobby_message) => {
+                            match downlink_lobby_message {
+                                server::common::DownlinkLobbyMessage::EnterAck { success } => {
+                                    if self.pending_matches(req_id) {
+                                        self.pending = None;
+                                        if success {
+                                            self.state = ViewState::Lobby(LobbyState::default());
+                                            break;
+                                        }
+                                    }
+                                }
+                                _ => unreachable!(),
+                            }
+                        }
+                        _ => unreachable!(),
+                    }
+                }
+                _ => unreachable!(),
+            }
+        }
+    }
+
+    fn ui_going_to_lobby(&mut self, ui: &mut egui::Ui) -> Option<UiAction> {
+        let action: Option<UiAction> = None;
+        ui.heading("Going To Lobby...");
+        return action;
+    }
+
+    fn handle_lobby(&mut self) {
+        let ViewState::Lobby(lobby_state) = &mut self.state else {
+            unreachable!()
+        };
+
+        while let Ok(event) = self.rx_msg.try_recv() {
+            match event {
+                NetworkTaskEvent::Disconnected => {
+                    self.state = ViewState::Home;
+                    break;
+                }
+                NetworkTaskEvent::Recv(downlink_message) => {
+                    let req_id = downlink_message.req_id;
+                    match downlink_message.msg {
+                        server::common::DownlinkMessageValue::Lobby(downlink_lobby_message) => {
+                            match downlink_lobby_message {
+                                server::common::DownlinkLobbyMessage::Chat {
+                                    client_id,
+                                    content,
+                                } => {
+                                    lobby_state.chat_log.push(format!("{client_id}: {content}"));
+                                }
+                                _ => unreachable!(),
+                            }
+                        }
+                        _ => unreachable!(),
+                    }
+                }
+                _ => unreachable!(),
+            }
+        }
+    }
+
+    fn ui_lobby(&mut self, ui: &mut egui::Ui) -> Option<UiAction> {
+        let ViewState::Lobby(lobby_state) = &mut self.state else {
+            unreachable!()
+        };
+
+        let mut action: Option<UiAction> = None;
+        ui.heading("Lobby");
+        ui.separator();
+        ui.label(format!("client_id: {}", self.client_id.unwrap()));
+        if ui.button("Disconnect").clicked() {
+            action = Some(UiAction::Disconnect);
+        }
+
+        ui.label("Chat");
+
+        let response = ui.text_edit_singleline(&mut lobby_state.chat_input);
+
+        if response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+            let content = lobby_state.chat_input.clone();
+            lobby_state.chat_input.clear();
+
+            action = Some(UiAction::SendLobbyChat(content));
+        }
+
+        for line in &lobby_state.chat_log {
+            ui.label(line);
+        }
+        return action;
     }
 }
 
@@ -275,16 +234,11 @@ impl eframe::App for App {
         // -------------------------
         // 1. Drain server messages
         // -------------------------
-        while let Ok(msg) = self.rx_msg.try_recv() {
-            match msg {
-                NetworkTaskEvent::Connected => {}
-                NetworkTaskEvent::Disconnected => {
-                    self.state = ViewState::Home;
-                }
-                NetworkTaskEvent::Recv(downlink_message) => {
-                    self.handle_server_msg(downlink_message);
-                }
-            }
+        match &mut self.state {
+            ViewState::Home => self.handle_home(),
+            ViewState::GoingToLobby => self.handle_going_to_lobby(),
+            ViewState::Lobby(_) => self.handle_lobby(),
+            ViewState::Room(_) => todo!(),
         }
 
         // -------------------------
@@ -297,48 +251,11 @@ impl eframe::App for App {
                 ui.label(format!("Pending: {}", p.description));
             }
 
-            match &mut self.state {
-                ViewState::Home => {
-                    ui.heading("Home");
-                    ui.separator();
-
-                    if ui.button("Connect").clicked() {
-                        action = Some(UiAction::Connect);
-                    }
-                }
-
-                ViewState::Lobby(lobby_state) => {
-                    ui.heading("Lobby");
-                    ui.separator();
-                    ui.label(format!("client_id: {}", self.client_id.unwrap()));
-                    if ui.button("Disconnect").clicked() {
-                        action = Some(UiAction::Disconnect);
-                    }
-
-                    ui.label("Chat");
-
-                    let response = ui.text_edit_singleline(&mut lobby_state.chat_input);
-
-                    if response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
-                        let content = lobby_state.chat_input.clone();
-                        lobby_state.chat_input.clear();
-
-                        action = Some(UiAction::SendLobbyChat(content));
-                    }
-
-                    for line in &self.chat_log {
-                        ui.label(line);
-                    }
-                }
-
-                ViewState::Room(id) => {
-                    ui.label(format!("You are in Room {}", id));
-
-                    // future action:
-                    // if ui.button("Leave").clicked() {
-                    //     action.push(UiAction::LeaveRoom);
-                    // }
-                }
+            action = match &self.state {
+                ViewState::Home => self.ui_home(ui),
+                ViewState::GoingToLobby => self.ui_going_to_lobby(ui),
+                ViewState::Lobby(_) => self.ui_lobby(ui),
+                ViewState::Room(_) => todo!(),
             }
         });
 
