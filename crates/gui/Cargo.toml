@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 eframe = { version = "0.34.1", default-features = false, features = [
-    "default_fonts", "glow", "x11"
+    "glow", "x11"
 ] }
 rustgo = { path = "../rustgo" }
 game = { path = "../game" }

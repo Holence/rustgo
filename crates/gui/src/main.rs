@@ -272,6 +272,25 @@ impl eframe::App for App {
     }
 }
 
+fn install_fonts(ctx: &egui::Context) {
+    let mut fonts = egui::FontDefinitions::empty();
+
+    fonts.font_data.insert(
+        "my_font".to_owned(),
+        std::sync::Arc::new(egui::FontData::from_static(include_bytes!(
+            "LXGWWenKai-Regular.ttf"
+        ))),
+    );
+
+    fonts
+        .families
+        .entry(egui::FontFamily::Proportional)
+        .or_default()
+        .insert(0, "my_font".to_owned());
+
+    ctx.set_fonts(fonts);
+}
+
 #[tokio::main]
 async fn main() {
     let (tx_cmd, rx_cmd) = mpsc::unbounded_channel();
@@ -283,7 +302,10 @@ async fn main() {
     eframe::run_native(
         "Client",
         options,
-        Box::new(|_cc| Ok(Box::new(App::new(tx_cmd, rx_msg)))),
+        Box::new(|cc| {
+            install_fonts(&cc.egui_ctx);
+            Ok(Box::new(App::new(tx_cmd, rx_msg)))
+        }),
     )
     .unwrap();
 }
