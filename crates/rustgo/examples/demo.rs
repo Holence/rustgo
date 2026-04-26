@@ -9,10 +9,15 @@ use cursive::{
     views::TextView,
 };
 
-use crate::{Coord, Stone, game::Game};
+use cursive::traits::Nameable;
+use cursive::view::Resizable;
+use cursive::views::{Dialog, LinearLayout, Panel};
+use rustgo::{Coord, Stone, board::Board};
 
 pub struct BoardView {
-    game: Game,
+    board: Board,
+    cur_stone: Stone,
+    n_stone: u8,
 }
 
 const X_TIMES: usize = 1; // you can modify this
@@ -35,9 +40,11 @@ const STAR: [(usize, usize); 9] = [
 ];
 
 impl BoardView {
-    pub fn new(size: usize, n_player: usize, n_stone: u8) -> Self {
+    pub fn new(size: usize, n_stone: u8) -> Self {
         Self {
-            game: Game::new(size, n_player, n_stone),
+            board: Board::new(size),
+            cur_stone: Stone::BLACK,
+            n_stone,
         }
     }
 
@@ -51,7 +58,7 @@ impl BoardView {
         let x = pos.x / CELL_PER_X;
         let y = pos.y / CELL_PER_Y;
 
-        if x < self.game.size() && y < self.game.size() {
+        if x < self.board.size() && y < self.board.size() {
             Some(Vec2::new(x, y))
         } else {
             None
@@ -60,11 +67,12 @@ impl BoardView {
 
     fn place_stone(&mut self, pos: Vec2) -> EventResult {
         let coord = Coord::new(pos.x, pos.y);
-        let result = self.game.place_stone(coord);
+        let result = self.board.place_stone(coord, self.cur_stone);
         match result {
             Ok(eaten) => {
                 // TODO
                 eaten;
+                self.cur_stone = self.cur_stone.next_stone(self.n_stone);
                 EventResult::with_cb_once(move |s| append_log(s, coord.to_string()))
             }
             Err(msg) => EventResult::with_cb(move |s| {
@@ -76,8 +84,8 @@ impl BoardView {
 
 impl View for BoardView {
     fn draw(&self, printer: &Printer) {
-        let size = self.game.size();
-        let board = self.game.board();
+        let size = self.board.size();
+        let board = self.board.board_array();
 
         let mut line = String::with_capacity(size);
         for y in 0..size {
@@ -104,8 +112,8 @@ impl View for BoardView {
 
     fn required_size(&mut self, _: Vec2) -> Vec2 {
         Vec2::new(
-            self.game.size() * CELL_PER_X + BOARD_OFFSET_X,
-            self.game.size() * CELL_PER_Y + BOARD_OFFSET_Y,
+            self.board.size() * CELL_PER_X + BOARD_OFFSET_X,
+            self.board.size() * CELL_PER_Y + BOARD_OFFSET_Y,
         )
     }
 
@@ -135,4 +143,24 @@ fn append_log(s: &mut cursive::Cursive, mut msg: String) {
     s.call_on_name("log", |view: &mut TextView| {
         view.append(msg);
     });
+}
+
+fn main() {
+    let mut siv = cursive::default();
+
+    let board = BoardView::new(19, 3);
+    let log_view = TextView::new("Log:\n").with_name("log").min_width(30);
+
+    siv.add_layer(
+        Dialog::new().title("围棋").content(
+            LinearLayout::horizontal()
+                .child(Panel::new(board))
+                .child(Panel::new(log_view)),
+        ),
+    );
+    siv.add_global_callback('q', |s| s.quit());
+
+    // siv.set_theme(Theme::terminal_default());
+
+    siv.run();
 }
