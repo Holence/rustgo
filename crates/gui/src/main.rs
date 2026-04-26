@@ -1,7 +1,5 @@
 use gui::network_task::{NetworkTaskCmd, NetworkTaskEvent, network_task};
-use server::common::{
-    ClientId, DownlinkLobbyMessage, DownlinkMessageValue, ReqId, RoomId, UplinkMessage,
-};
+use server::common::{ClientId, DownlinkMessage, ReqId, RoomId, UplinkMessage};
 use std::fmt::Debug;
 use tokio::sync::mpsc;
 
@@ -121,31 +119,27 @@ impl App {
                     self.change_state(ViewState::Home);
                     break;
                 }
-                NetworkTaskEvent::Recv(downlink_message) => {
-                    let req_id = downlink_message.req_id;
-                    match downlink_message.msg {
-                        DownlinkMessageValue::Greeting(client_id) => {
-                            self.client_id = Some(client_id);
-                            let req_id = self.next_req();
-                            self.pending = Some(Pending {
-                                req_id,
-                                description: "Enter Lobby".to_string(),
-                            });
-                            self.send(UplinkMessage::LobbyEnter { client_id, req_id });
-                        }
-
-                        DownlinkMessageValue::Lobby(DownlinkLobbyMessage::EnterAck { success }) => {
-                            if self.pending_matches(req_id) {
-                                self.pending = None;
-                                if success {
-                                    self.change_state(ViewState::Lobby(LobbyState::default()));
-                                    break;
-                                }
+                NetworkTaskEvent::Recv(downlink_message) => match downlink_message {
+                    server::common::DownlinkMessage::Greeting { client_id } => {
+                        self.client_id = Some(client_id);
+                        let req_id = self.next_req();
+                        self.pending = Some(Pending {
+                            req_id,
+                            description: "Enter Lobby".to_string(),
+                        });
+                        self.send(UplinkMessage::LobbyEnter { client_id, req_id });
+                    }
+                    server::common::DownlinkMessage::LobbyEnterAck { req_id, success } => {
+                        if self.pending_matches(req_id) {
+                            self.pending = None;
+                            if success {
+                                self.change_state(ViewState::Lobby(LobbyState::default()));
+                                break;
                             }
                         }
-                        _ => unreachable!(),
                     }
-                }
+                    _ => unreachable!(),
+                },
                 _ => unreachable!(),
             }
         }
@@ -168,17 +162,8 @@ impl App {
                     self.change_state(ViewState::Home);
                     break;
                 }
-                NetworkTaskEvent::Recv(downlink_message) => {
-                    let req_id = downlink_message.req_id;
-                    match downlink_message.msg {
-                        DownlinkMessageValue::Lobby(DownlinkLobbyMessage::Chat {
-                            client_id,
-                            content,
-                        }) => {
-                            lobby_state.chat_log.push(format!("{client_id}: {content}"));
-                        }
-                        _ => unreachable!(),
-                    }
+                NetworkTaskEvent::Recv(DownlinkMessage::LobbyChat { client_id, content }) => {
+                    lobby_state.chat_log.push(format!("{client_id}: {content}"));
                 }
                 _ => unreachable!(),
             }

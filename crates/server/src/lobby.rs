@@ -3,9 +3,7 @@ use std::collections::HashMap;
 use log::{error, info};
 use tokio::sync::mpsc;
 
-use crate::common::{
-    ClientId, DownlinkLobbyMessage, DownlinkMessage, DownlinkMessageValue, ReqId, RoomId,
-};
+use crate::common::{ClientId, DownlinkMessage, ReqId, RoomId};
 
 #[derive(Clone)]
 pub enum LobbyMessage {
@@ -56,11 +54,9 @@ impl LobbyActor {
                     self.clients.insert(client_id, tx);
                     self.send_to_session(
                         client_id,
-                        DownlinkMessage {
+                        DownlinkMessage::LobbyEnterAck {
                             req_id,
-                            msg: DownlinkMessageValue::Lobby(DownlinkLobbyMessage::EnterAck {
-                                success: true,
-                            }),
+                            success: true,
                         },
                     )
                     .await;
@@ -70,13 +66,7 @@ impl LobbyActor {
                 }
                 LobbyMessage::Chat { client_id, content } => {
                     info!("hear client[{}] says '{}'", client_id, content);
-                    let msg = DownlinkMessage {
-                        req_id: 0,
-                        msg: DownlinkMessageValue::Lobby(DownlinkLobbyMessage::Chat {
-                            client_id,
-                            content,
-                        }),
-                    };
+                    let msg = DownlinkMessage::LobbyChat { client_id, content };
                     for tx in self.clients.values() {
                         tx.send(msg.clone()).await.unwrap();
                     }

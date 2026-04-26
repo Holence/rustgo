@@ -13,48 +13,38 @@ pub enum Action {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
-pub enum DownlinkLobbyMessage {
-    EnterAck {
-        success: bool,
-    },
-    Chat {
+pub enum DownlinkMessage {
+    Greeting {
         client_id: ClientId,
-        content: String,
     },
-    // Update{ room info }
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub enum DownlinkRoomMessage {
-    CreateAck {
-        success: bool,
-        room_id: RoomId,
-    },
-    EnterAck {
-        success: bool,
-        room_id: RoomId,
-    },
-    Chat {
-        room_id: RoomId,
-        client_id: ClientId,
-        content: String,
-    },
-    QuitAck,
-    // Update { team info}
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub enum DownlinkMessageValue {
-    Greeting(ClientId),
     PingEcho,
     Shutdown,
-    Lobby(DownlinkLobbyMessage),
-    Room(DownlinkRoomMessage),
-}
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct DownlinkMessage {
-    pub req_id: ReqId,
-    pub msg: DownlinkMessageValue,
+
+    LobbyEnterAck {
+        req_id: ReqId,
+        success: bool,
+    },
+    LobbyChat {
+        client_id: ClientId,
+        content: String,
+    },
+
+    RoomCreateAck {
+        req_id: ReqId,
+        success: bool,
+        room_id: RoomId,
+    },
+    RoomEnterAck {
+        req_id: ReqId,
+        success: bool,
+        room_id: RoomId,
+    },
+    RoomChat {
+        room_id: RoomId,
+        client_id: ClientId,
+        content: String,
+    },
+    RoomQuitAck,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]

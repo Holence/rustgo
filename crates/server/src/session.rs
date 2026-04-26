@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use log::{error, info, log};
+use log::{error, info};
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
     net::{
@@ -50,12 +50,13 @@ impl SessionActor {
             .await
             .unwrap();
 
+        sleep(Duration::from_millis(500)).await;
         self.client_id = client_id_rx.await.unwrap();
+        info!("client_id[{}] conncted", self.client_id);
 
         // writer task
         let writer_task = tokio::spawn(async move {
             while let Some(msg) = session_rx.recv().await {
-                sleep(Duration::from_secs(1)).await;
                 let msg = serde_json::to_string(&msg).unwrap();
                 info!("[{}] write {msg}", self.client_id);
                 self.writer.write_all(msg.as_bytes()).await.unwrap();
@@ -75,7 +76,7 @@ impl SessionActor {
                         .unwrap();
                 }
                 Err(err) => {
-                    eprintln!("[{}] parse uplink error: {err}", self.client_id);
+                    error!("[{}] parse uplink error: {err}", self.client_id);
                 }
             }
         }
@@ -89,6 +90,6 @@ impl SessionActor {
 
         writer_task.await.unwrap();
 
-        println!("Session {} stopped", self.client_id);
+        info!("client_id[{}] disconncted", self.client_id);
     }
 }
