@@ -29,10 +29,9 @@ pub enum DownlinkMessage {
         content: String,
     },
 
-    RoomCreateAck {
+    LobbyCreateRoomAck {
         req_id: ReqId,
-        success: bool,
-        room_id: RoomId,
+        room_id: Option<RoomId>,
     },
     RoomEnterAck {
         req_id: ReqId,
@@ -67,6 +66,7 @@ pub enum UplinkMessage {
     LobbyCreateRoom {
         client_id: ClientId,
         req_id: ReqId,
+        room_name: String,
     },
     RoomEnter {
         client_id: ClientId,

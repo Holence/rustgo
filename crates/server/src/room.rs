@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use tokio::sync::mpsc;
 
 use crate::common::{ClientId, DownlinkMessage};
@@ -11,4 +13,33 @@ pub enum RoomMessage {
     // TODO JoinTeam(PlayerId, TeamId)
     // TODO LeaveTeam(PlayerId, TeamId)
     Quit(ClientId),
+}
+
+pub struct RoomActor {
+    rx: mpsc::Receiver<RoomMessage>,
+    room_name: String,
+    host: ClientId, // 房主
+
+    sessions_tx: HashMap<ClientId, mpsc::Sender<DownlinkMessage>>,
+}
+
+impl RoomActor {
+    pub fn new(rx: mpsc::Receiver<RoomMessage>, room_name: String, host: ClientId) -> Self {
+        Self {
+            rx,
+            room_name,
+            host,
+            sessions_tx: HashMap::new(),
+        }
+    }
+
+    pub async fn run(mut self) {
+        while let Some(msg) = self.rx.recv().await {
+            match msg {
+                RoomMessage::Enter(_, sender) => todo!(),
+                RoomMessage::RoomChat(_, _) => todo!(),
+                RoomMessage::Quit(_) => todo!(),
+            }
+        }
+    }
 }

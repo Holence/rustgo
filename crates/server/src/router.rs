@@ -10,6 +10,7 @@ use crate::{
     session::SessionActorTx,
 };
 
+// TODO 真的有必要加这么一层router吗，直接由Lobby做转发不是更省事吗，这里还得额外维护记录rooms、sessions
 #[derive(Debug)]
 pub enum RouterMessage {
     RegisterSession {
@@ -21,6 +22,13 @@ pub enum RouterMessage {
     },
     ClientMessage {
         msg: UplinkMessage,
+    },
+    RegisterRoom {
+        room_id: RoomId,
+        room_tx: mpsc::Sender<RoomMessage>,
+    },
+    UnregisterRoom {
+        room_id: RoomId,
     },
 }
 
@@ -122,7 +130,18 @@ impl RouterActor {
                         self.send_to_lobby(LobbyMessage::Chat { client_id, content })
                             .await;
                     }
-                    UplinkMessage::LobbyCreateRoom { client_id, req_id } => todo!(),
+                    UplinkMessage::LobbyCreateRoom {
+                        client_id,
+                        req_id,
+                        room_name,
+                    } => {
+                        self.send_to_lobby(LobbyMessage::CreateRoom {
+                            client_id,
+                            req_id,
+                            room_name,
+                        })
+                        .await
+                    }
                     UplinkMessage::RoomEnter {
                         client_id,
                         req_id,
@@ -139,6 +158,14 @@ impl RouterActor {
                         room_id,
                     } => todo!(),
                 },
+                RouterMessage::RegisterRoom { room_id, room_tx } => {
+                    if self.rooms_tx.contains_key(&room_id) {
+                        error!("room[{room_id}] already exsist");
+                        continue;
+                    }
+                    self.rooms_tx.insert(room_id, room_tx);
+                }
+                RouterMessage::UnregisterRoom { room_id } => todo!(),
             }
         }
     }
