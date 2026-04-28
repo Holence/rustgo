@@ -8,7 +8,6 @@ flowchart TB
       lobby("Lobby")
       room1("Room1")
       room2("Room2")
-      router("Router")
   end
   subgraph session_in["Sessions"]
       session1_in["Session1 In"]
@@ -31,17 +30,17 @@ flowchart TB
       client4("Client4")
       client5("Client5")
   end
-  router --> lobby & room1 & room2
+  lobby --> room1 & room2
   client1 --> session1_in
   client2 --> session2_in
   client3 --> session3_in
   client4 --> session4_in
   client5 --> session5_in
-  session1_in --> router
-  session2_in --> router
-  session3_in --> router
-  session4_in --> router
-  session5_in --> router
+  session1_in --> lobby
+  session2_in --> lobby
+  session3_in --> lobby
+  session4_in --> lobby
+  session5_in --> lobby
   session1_out --> client1
   session2_out --> client2
   session3_out --> client3

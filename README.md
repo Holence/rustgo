@@ -32,7 +32,7 @@ Server
 - [ ] client上传事件后需要等server返回ack，gui里的state为pending
 - [ ] 进入Room后ack当前完整状态, 后续的状态更新, 返回 update info (add/remove)
 - [ ] GUI Client实现Lobby/Room/Game
-- [ ] 区分掉线导致的 RouterMessage::UnregisterSession 与 主动的Quit
+- [ ] 区分掉线导致的 LobbyMessage::UnregisterSession 与 主动的Quit
 - [ ] Server支持TCP连接
 - [ ] ...
 - [ ] HTTP+WebSocket???

@@ -12,12 +12,9 @@ use tokio::{
 };
 
 use crate::{
-    common::{ClientId, DownlinkMessage, UplinkMessage},
-    router::RouterMessage,
+    common::{ClientId, UplinkMessage},
+    lobby::LobbyMessage,
 };
-
-pub type SessionActorRx = mpsc::Receiver<UplinkMessage>;
-pub type SessionActorTx = mpsc::Sender<DownlinkMessage>;
 
 pub struct SessionActor {
     reader: BufReader<OwnedReadHalf>,
@@ -36,14 +33,14 @@ impl SessionActor {
         }
     }
 
-    pub async fn run(mut self, router_tx: mpsc::Sender<RouterMessage>) {
+    pub async fn run(mut self, lobby_tx: mpsc::Sender<LobbyMessage>) {
         let mut lines = self.reader.lines();
 
         let (session_tx, mut session_rx) = mpsc::channel(32);
 
         let (client_id_tx, client_id_rx) = oneshot::channel::<ClientId>();
-        router_tx
-            .send(RouterMessage::RegisterSession {
+        lobby_tx
+            .send(LobbyMessage::RegisterSession {
                 client_id_tx,
                 session_tx,
             })
@@ -70,8 +67,8 @@ impl SessionActor {
             match serde_json::from_str::<UplinkMessage>(&line) {
                 Ok(msg) => {
                     // TODO some check and filter for malicious package?
-                    router_tx
-                        .send(RouterMessage::ClientMessage { msg })
+                    lobby_tx
+                        .send(LobbyMessage::ClientMessage { msg })
                         .await
                         .unwrap();
                 }
@@ -81,8 +78,8 @@ impl SessionActor {
             }
         }
 
-        router_tx
-            .send(RouterMessage::UnregisterSession {
+        lobby_tx
+            .send(LobbyMessage::UnregisterSession {
                 client_id: self.client_id,
             })
             .await
