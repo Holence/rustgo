@@ -1,7 +1,9 @@
+use std::collections::HashMap;
+
 use rustgo::{Coord, Stone};
 use serde::{Deserialize, Serialize};
 
-use crate::lobby::RoomInfoUpdate;
+use crate::lobby::{ChatRecord, LobbyPartialInfo, RoomRecord};
 
 pub type ClientId = u64;
 pub type RoomId = u64;
@@ -18,16 +20,14 @@ pub enum Action {
 pub enum DownlinkMessage {
     Greeting {
         client_id: ClientId,
+        chats: Vec<ChatRecord>,
+        rooms: HashMap<RoomId, RoomRecord>,
     },
     PingEcho,
     Shutdown,
 
-    LobbyChat {
-        client_id: ClientId,
-        content: String,
-    },
-    LobbyRoomInfoUpdate {
-        info: RoomInfoUpdate,
+    LobbyUpdate {
+        info: LobbyPartialInfo,
     },
 
     LobbyCreateRoomAck {

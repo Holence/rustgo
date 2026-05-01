@@ -55,7 +55,7 @@ impl ClientActor {
         let writer_task = tokio::spawn(async move {
             while let Some(msg) = client_rx.recv().await {
                 let msg = serde_json::to_string(&msg).unwrap();
-                info!("[{}] write {msg}", self.client_id);
+                info!("client[{}] write {msg}", self.client_id);
                 self.writer.write_all(msg.as_bytes()).await.unwrap();
                 self.writer.write_all(b"\n").await.unwrap();
             }
@@ -87,6 +87,6 @@ impl ClientActor {
 
         writer_task.await.unwrap();
 
-        info!("client_id[{}] disconncted", self.client_id);
+        info!("client[{}] disconncted", self.client_id);
     }
 }

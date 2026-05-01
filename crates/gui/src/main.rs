@@ -1,23 +1,39 @@
 use gui::network_task::{NetworkTaskCmd, NetworkTaskEvent, network_task};
-use server::common::{ClientId, DownlinkMessage, ReqId, RoomId, UplinkMessage};
-use std::fmt::Debug;
+use server::{
+    common::{ClientId, DownlinkMessage, ReqId, RoomId, UplinkMessage},
+    lobby::{ChatRecord, LobbyPartialInfo, RoomRecord},
+};
+use std::{collections::HashMap, fmt::Debug};
 use tokio::sync::mpsc;
 
-use eframe::egui;
+use eframe::egui::{self};
 
 #[derive(Default, Debug, Clone)]
 struct LobbyState {
     pub(crate) chat_input: String,
-    pub(crate) chat_log: Vec<String>,
+    pub(crate) chats: Vec<ChatRecord>,
+    pub(crate) rooms: HashMap<RoomId, RoomRecord>,
     pub(crate) create_room_dialog_open: bool,
     pub(crate) create_room_name_input: String,
+}
+
+impl LobbyState {
+    fn new(chats: Vec<ChatRecord>, rooms: HashMap<RoomId, RoomRecord>) -> Self {
+        Self {
+            chat_input: String::new(),
+            chats,
+            rooms,
+            create_room_dialog_open: false,
+            create_room_name_input: String::new(),
+        }
+    }
 }
 
 #[derive(Default, Debug, Clone)]
 struct RoomState {
     pub(crate) room_id: RoomId,
     pub(crate) chat_input: String,
-    pub(crate) chat_log: Vec<String>,
+    pub(crate) chats: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -128,9 +144,13 @@ impl App {
                 NetworkTaskEvent::Disconnected => {
                     self.change_state(ViewState::Home);
                 }
-                NetworkTaskEvent::Recv(DownlinkMessage::Greeting { client_id }) => {
+                NetworkTaskEvent::Recv(DownlinkMessage::Greeting {
+                    client_id,
+                    chats,
+                    rooms,
+                }) => {
                     self.client_id = Some(client_id);
-                    self.change_state(ViewState::Lobby(LobbyState::default()));
+                    self.change_state(ViewState::Lobby(LobbyState::new(chats, rooms)));
                 }
                 _ => unreachable!(),
             }
@@ -153,9 +173,17 @@ impl App {
                 NetworkTaskEvent::Disconnected => {
                     self.change_state(ViewState::Home);
                 }
-                NetworkTaskEvent::Recv(DownlinkMessage::LobbyChat { client_id, content }) => {
-                    lobby_state.chat_log.push(format!("{client_id}: {content}"));
-                }
+                NetworkTaskEvent::Recv(DownlinkMessage::LobbyUpdate { info }) => match info {
+                    LobbyPartialInfo::Chat(chat_record) => {
+                        lobby_state.chats.push(chat_record);
+                    }
+                    LobbyPartialInfo::Room {
+                        room_id,
+                        room_record,
+                    } => {
+                        lobby_state.rooms.insert(room_id, room_record);
+                    }
+                },
                 NetworkTaskEvent::Recv(DownlinkMessage::LobbyCreateRoomAck { req_id, room_id }) => {
                     if self.pending_matches(req_id) {
                         self.pending = None;
@@ -163,7 +191,7 @@ impl App {
                             self.change_state(ViewState::Room(RoomState {
                                 room_id,
                                 chat_input: String::new(),
-                                chat_log: vec![],
+                                chats: vec![],
                             }));
                         }
                     }
@@ -200,8 +228,15 @@ impl App {
             action = Some(UiAction::SendLobbyChat(content));
         }
 
-        for line in &lobby_state.chat_log {
-            ui.label(line);
+        for chat_record in &lobby_state.chats {
+            ui.label(format!(
+                "client[{}]: {}",
+                chat_record.client_id, chat_record.content
+            ));
+        }
+
+        for (room_id, room_record) in &lobby_state.rooms {
+            ui.label(format!("room[{}]: {}", room_id, room_record.room_name));
         }
 
         if lobby_state.create_room_dialog_open {
@@ -260,7 +295,7 @@ impl App {
                 NetworkTaskEvent::Recv(DownlinkMessage::RoomQuitAck) => {
                     todo!()
                 }
-                _ => unreachable!(),
+                _ => unreachable!("{:?}", event),
             }
         }
     }
@@ -289,7 +324,7 @@ impl App {
             action = Some(UiAction::SendRoomChat(content));
         }
 
-        for line in &room_state.chat_log {
+        for line in &room_state.chats {
             ui.label(line);
         }
 

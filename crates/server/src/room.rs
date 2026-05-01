@@ -38,7 +38,9 @@ impl RoomActor {
             match msg {
                 RoomMessage::Enter(_, sender) => todo!(),
                 RoomMessage::RoomChat(_, _) => todo!(),
-                RoomMessage::Quit(_) => todo!(),
+                RoomMessage::Quit(client_id) => {
+                    self.clients_tx.remove(&client_id);
+                }
             }
         }
     }
