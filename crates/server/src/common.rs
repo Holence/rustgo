@@ -1,6 +1,8 @@
 use rustgo::{Coord, Stone};
 use serde::{Deserialize, Serialize};
 
+use crate::lobby::RoomInfoUpdate;
+
 pub type ClientId = u64;
 pub type RoomId = u64;
 pub type ReqId = u64;
@@ -20,13 +22,12 @@ pub enum DownlinkMessage {
     PingEcho,
     Shutdown,
 
-    LobbyEnterAck {
-        req_id: ReqId,
-        success: bool,
-    },
     LobbyChat {
         client_id: ClientId,
         content: String,
+    },
+    LobbyRoomInfoUpdate {
+        info: RoomInfoUpdate,
     },
 
     LobbyCreateRoomAck {
@@ -48,16 +49,15 @@ pub enum DownlinkMessage {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum UplinkMessage {
+    // TODO Login {
+    //     name: String,
+    // },
     Ping {
         client_id: ClientId,
         req_id: ReqId,
     },
     Quit {
         client_id: ClientId,
-    },
-    LobbyEnter {
-        client_id: ClientId,
-        req_id: ReqId,
     },
     LobbyChat {
         client_id: ClientId,

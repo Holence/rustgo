@@ -128,26 +128,10 @@ impl App {
                 NetworkTaskEvent::Disconnected => {
                     self.change_state(ViewState::Home);
                 }
-                NetworkTaskEvent::Recv(downlink_message) => match downlink_message {
-                    server::common::DownlinkMessage::Greeting { client_id } => {
-                        self.client_id = Some(client_id);
-                        let req_id = self.next_req();
-                        self.pending = Some(Pending {
-                            req_id,
-                            description: "Enter Lobby".to_string(),
-                        });
-                        self.send(UplinkMessage::LobbyEnter { client_id, req_id });
-                    }
-                    server::common::DownlinkMessage::LobbyEnterAck { req_id, success } => {
-                        if self.pending_matches(req_id) {
-                            self.pending = None;
-                            if success {
-                                self.change_state(ViewState::Lobby(LobbyState::default()));
-                            }
-                        }
-                    }
-                    _ => unreachable!(),
-                },
+                NetworkTaskEvent::Recv(DownlinkMessage::Greeting { client_id }) => {
+                    self.client_id = Some(client_id);
+                    self.change_state(ViewState::Lobby(LobbyState::default()));
+                }
                 _ => unreachable!(),
             }
         }

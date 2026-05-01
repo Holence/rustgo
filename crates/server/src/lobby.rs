@@ -1,12 +1,32 @@
 use std::collections::HashMap;
 
 use log::{error, info};
+use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, oneshot};
 
 use crate::{
     common::{ClientId, DownlinkMessage, RoomId, UplinkMessage},
     room::{RoomActor, RoomMessage},
 };
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub enum RoomInfoUpdate {
+    ChangeName { room_id: RoomId, room_name: String },
+    // ChangeState { room_id: RoomId } // state: Teaming/GameStart/GameEnd
+}
+
+struct RoomInfo {
+    room_tx: mpsc::Sender<RoomMessage>,
+    room_name: String,
+    // state: Teaming/GameStart/GameEnd
+}
+
+// TODO rename session to client
+struct SessionInfo {
+    session_tx: mpsc::Sender<DownlinkMessage>,
+    // client_name: String,
+    location: ClientLocation,
+}
 
 pub enum LobbyMessage {
     RegisterSession {
@@ -19,6 +39,9 @@ pub enum LobbyMessage {
     ClientMessage {
         msg: UplinkMessage,
     },
+    RoomInfoUpdate {
+        info: RoomInfoUpdate,
+    },
 }
 
 enum ClientLocation {
@@ -28,28 +51,26 @@ enum ClientLocation {
 
 pub struct LobbyActor {
     rx: mpsc::Receiver<LobbyMessage>,
-    rooms_tx: HashMap<RoomId, mpsc::Sender<RoomMessage>>, // LobbyActor -> [RoomActor, ...]
-    sessions_tx: HashMap<ClientId, mpsc::Sender<DownlinkMessage>>, // // LobbyActor -> [SessionActor, ...]
+    sessions: HashMap<ClientId, SessionInfo>,
+    rooms: HashMap<RoomId, RoomInfo>,
     next_client_id: ClientId,
     next_room_id: RoomId,
-    clients_location: HashMap<ClientId, ClientLocation>,
 }
 
 impl LobbyActor {
     pub fn new(rx: mpsc::Receiver<LobbyMessage>) -> Self {
         Self {
             rx,
-            rooms_tx: HashMap::new(),
-            sessions_tx: HashMap::new(),
+            sessions: HashMap::new(),
+            rooms: HashMap::new(),
             next_client_id: 0,
             next_room_id: 0,
-            clients_location: HashMap::new(),
         }
     }
 
     async fn send_to_session(&self, client_id: ClientId, msg: DownlinkMessage) {
-        if let Some(tx) = self.sessions_tx.get(&client_id) {
-            tx.send(msg).await.unwrap();
+        if let Some(session_info) = self.sessions.get(&client_id) {
+            session_info.session_tx.send(msg).await.unwrap();
         } else {
             error!("client {client_id} not exist");
         }
@@ -59,28 +80,18 @@ impl LobbyActor {
         match msg {
             UplinkMessage::Ping { client_id, req_id } => todo!(),
             UplinkMessage::Quit { client_id } => {
-                self.sessions_tx.remove(&client_id);
-            }
-            UplinkMessage::LobbyEnter { client_id, req_id } => {
-                self.send_to_session(
-                    client_id,
-                    DownlinkMessage::LobbyEnterAck {
-                        req_id,
-                        success: true,
-                    },
-                )
-                .await;
+                self.sessions.remove(&client_id);
             }
             UplinkMessage::LobbyChat { client_id, content } => {
-                if !self.sessions_tx.contains_key(&client_id) {
+                if !self.sessions.contains_key(&client_id) {
                     error!("session[{client_id}] not exist");
                     return;
                 }
 
                 info!("hear client[{client_id}] says '{content}'");
                 let msg = DownlinkMessage::LobbyChat { client_id, content };
-                for tx in self.sessions_tx.values() {
-                    tx.send(msg.clone()).await.unwrap();
+                for session_info in self.sessions.values() {
+                    session_info.session_tx.send(msg.clone()).await.unwrap();
                 }
             }
             UplinkMessage::LobbyCreateRoom {
@@ -88,17 +99,17 @@ impl LobbyActor {
                 req_id,
                 room_name,
             } => {
-                if !self.sessions_tx.contains_key(&client_id) {
+                if !self.sessions.contains_key(&client_id) {
                     error!("session[{client_id}] not exist");
                     return;
                 }
 
                 let (room_tx, room_rx) = mpsc::channel(32);
-                let room_actor = RoomActor::new(room_rx, room_name, client_id);
+                let room_actor = RoomActor::new(room_rx, room_name.clone(), client_id);
                 tokio::spawn(room_actor.run());
 
                 let room_id = self.next_room_id;
-                self.rooms_tx.insert(room_id, room_tx.clone());
+                self.rooms.insert(room_id, RoomInfo { room_tx, room_name });
 
                 self.send_to_session(
                     client_id,
@@ -137,7 +148,13 @@ impl LobbyActor {
                     session_tx,
                 } => {
                     let client_id = self.next_client_id;
-                    self.sessions_tx.insert(client_id, session_tx);
+                    self.sessions.insert(
+                        client_id,
+                        SessionInfo {
+                            session_tx,
+                            location: ClientLocation::AtLobby,
+                        },
+                    );
 
                     client_id_tx.send(client_id).unwrap();
                     self.send_to_session(client_id, DownlinkMessage::Greeting { client_id })
@@ -146,18 +163,18 @@ impl LobbyActor {
                     self.next_client_id += 1;
                 }
                 LobbyMessage::UnregisterSession { client_id } => {
-                    if !self.sessions_tx.contains_key(&client_id) {
+                    let Some(session_info) = self.sessions.remove(&client_id) else {
                         error!("session[{}] not exists", client_id);
-                    }
-                    self.sessions_tx.remove(&client_id);
-                    if let Some(location) = self.clients_location.get(&client_id) {
-                        match location {
-                            ClientLocation::AtLobby => todo!(),
-                            ClientLocation::AtRoom(_) => todo!(),
-                        }
+                        continue;
+                    };
+
+                    match session_info.location {
+                        ClientLocation::AtLobby => todo!(),
+                        ClientLocation::AtRoom(_) => todo!(),
                     }
                 }
                 LobbyMessage::ClientMessage { msg } => self.handle_msg(msg).await,
+                LobbyMessage::RoomInfoUpdate { info } => todo!(),
             }
         }
     }
