@@ -1,5 +1,5 @@
 use log::info;
-use server::{lobby::LobbyActor, session::SessionActor};
+use server::{client::ClientActor, lobby::LobbyActor};
 use tokio::{net::TcpListener, sync::mpsc};
 
 #[tokio::main]
@@ -32,8 +32,8 @@ async fn main() {
     loop {
         let (stream, addr) = listener.accept().await.unwrap();
         info!("{} connected", addr);
-        let session_actor = SessionActor::new(stream);
-        tokio::spawn(session_actor.run(lobby_tx.clone()));
+        let client_actor = ClientActor::new(stream);
+        tokio::spawn(client_actor.run(lobby_tx.clone()));
     }
     // ctrl+c drop(lobby_tx);
 }

@@ -50,7 +50,7 @@ pub enum DownlinkMessage {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum UplinkMessage {
     // TODO Login {
-    //     name: String,
+    //     client_id: String,
     // },
     Ping {
         client_id: ClientId,

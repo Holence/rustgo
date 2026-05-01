@@ -16,17 +16,17 @@ use crate::{
     lobby::LobbyMessage,
 };
 
-pub struct SessionActor {
+pub struct ClientActor {
     reader: BufReader<OwnedReadHalf>,
     writer: OwnedWriteHalf,
     client_id: ClientId,
 }
 
-impl SessionActor {
+impl ClientActor {
     pub fn new(stream: TcpStream) -> Self {
         let (reader, writer) = stream.into_split();
         let reader: BufReader<OwnedReadHalf> = BufReader::new(reader);
-        SessionActor {
+        ClientActor {
             reader,
             writer,
             client_id: 0,
@@ -36,13 +36,13 @@ impl SessionActor {
     pub async fn run(mut self, lobby_tx: mpsc::Sender<LobbyMessage>) {
         let mut lines = self.reader.lines();
 
-        let (session_tx, mut session_rx) = mpsc::channel(32);
+        let (client_tx, mut client_rx) = mpsc::channel(32);
 
         let (client_id_tx, client_id_rx) = oneshot::channel::<ClientId>();
         lobby_tx
-            .send(LobbyMessage::RegisterSession {
+            .send(LobbyMessage::RegisterClient {
                 client_id_tx,
-                session_tx,
+                client_tx,
             })
             .await
             .unwrap();
@@ -53,7 +53,7 @@ impl SessionActor {
 
         // writer task
         let writer_task = tokio::spawn(async move {
-            while let Some(msg) = session_rx.recv().await {
+            while let Some(msg) = client_rx.recv().await {
                 let msg = serde_json::to_string(&msg).unwrap();
                 info!("[{}] write {msg}", self.client_id);
                 self.writer.write_all(msg.as_bytes()).await.unwrap();
@@ -79,7 +79,7 @@ impl SessionActor {
         }
 
         lobby_tx
-            .send(LobbyMessage::UnregisterSession {
+            .send(LobbyMessage::UnregisterClient {
                 client_id: self.client_id,
             })
             .await

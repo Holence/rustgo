@@ -21,19 +21,23 @@ struct RoomInfo {
     // state: Teaming/GameStart/GameEnd
 }
 
-// TODO rename session to client
-struct SessionInfo {
-    session_tx: mpsc::Sender<DownlinkMessage>,
+enum ClientLocation {
+    AtLobby,
+    AtRoom(RoomId),
+}
+
+struct ClientInfo {
+    client_tx: mpsc::Sender<DownlinkMessage>,
     // client_name: String,
     location: ClientLocation,
 }
 
 pub enum LobbyMessage {
-    RegisterSession {
+    RegisterClient {
         client_id_tx: oneshot::Sender<ClientId>,
-        session_tx: mpsc::Sender<DownlinkMessage>,
+        client_tx: mpsc::Sender<DownlinkMessage>,
     },
-    UnregisterSession {
+    UnregisterClient {
         client_id: ClientId,
     },
     ClientMessage {
@@ -44,14 +48,9 @@ pub enum LobbyMessage {
     },
 }
 
-enum ClientLocation {
-    AtLobby,
-    AtRoom(RoomId),
-}
-
 pub struct LobbyActor {
     rx: mpsc::Receiver<LobbyMessage>,
-    sessions: HashMap<ClientId, SessionInfo>,
+    clients: HashMap<ClientId, ClientInfo>,
     rooms: HashMap<RoomId, RoomInfo>,
     next_client_id: ClientId,
     next_room_id: RoomId,
@@ -61,16 +60,16 @@ impl LobbyActor {
     pub fn new(rx: mpsc::Receiver<LobbyMessage>) -> Self {
         Self {
             rx,
-            sessions: HashMap::new(),
+            clients: HashMap::new(),
             rooms: HashMap::new(),
             next_client_id: 0,
             next_room_id: 0,
         }
     }
 
-    async fn send_to_session(&self, client_id: ClientId, msg: DownlinkMessage) {
-        if let Some(session_info) = self.sessions.get(&client_id) {
-            session_info.session_tx.send(msg).await.unwrap();
+    async fn send_to_client(&self, client_id: ClientId, msg: DownlinkMessage) {
+        if let Some(client_info) = self.clients.get(&client_id) {
+            client_info.client_tx.send(msg).await.unwrap();
         } else {
             error!("client {client_id} not exist");
         }
@@ -80,18 +79,18 @@ impl LobbyActor {
         match msg {
             UplinkMessage::Ping { client_id, req_id } => todo!(),
             UplinkMessage::Quit { client_id } => {
-                self.sessions.remove(&client_id);
+                self.clients.remove(&client_id);
             }
             UplinkMessage::LobbyChat { client_id, content } => {
-                if !self.sessions.contains_key(&client_id) {
-                    error!("session[{client_id}] not exist");
+                if !self.clients.contains_key(&client_id) {
+                    error!("client[{client_id}] not exist");
                     return;
                 }
 
                 info!("hear client[{client_id}] says '{content}'");
                 let msg = DownlinkMessage::LobbyChat { client_id, content };
-                for session_info in self.sessions.values() {
-                    session_info.session_tx.send(msg.clone()).await.unwrap();
+                for client_info in self.clients.values() {
+                    client_info.client_tx.send(msg.clone()).await.unwrap();
                 }
             }
             UplinkMessage::LobbyCreateRoom {
@@ -99,8 +98,8 @@ impl LobbyActor {
                 req_id,
                 room_name,
             } => {
-                if !self.sessions.contains_key(&client_id) {
-                    error!("session[{client_id}] not exist");
+                if !self.clients.contains_key(&client_id) {
+                    error!("client[{client_id}] not exist");
                     return;
                 }
 
@@ -111,7 +110,7 @@ impl LobbyActor {
                 let room_id = self.next_room_id;
                 self.rooms.insert(room_id, RoomInfo { room_tx, room_name });
 
-                self.send_to_session(
+                self.send_to_client(
                     client_id,
                     DownlinkMessage::LobbyCreateRoomAck {
                         req_id,
@@ -143,32 +142,32 @@ impl LobbyActor {
     pub async fn run(mut self) {
         while let Some(msg) = self.rx.recv().await {
             match msg {
-                LobbyMessage::RegisterSession {
+                LobbyMessage::RegisterClient {
                     client_id_tx,
-                    session_tx,
+                    client_tx,
                 } => {
                     let client_id = self.next_client_id;
-                    self.sessions.insert(
+                    self.clients.insert(
                         client_id,
-                        SessionInfo {
-                            session_tx,
+                        ClientInfo {
+                            client_tx,
                             location: ClientLocation::AtLobby,
                         },
                     );
 
                     client_id_tx.send(client_id).unwrap();
-                    self.send_to_session(client_id, DownlinkMessage::Greeting { client_id })
+                    self.send_to_client(client_id, DownlinkMessage::Greeting { client_id })
                         .await;
 
                     self.next_client_id += 1;
                 }
-                LobbyMessage::UnregisterSession { client_id } => {
-                    let Some(session_info) = self.sessions.remove(&client_id) else {
-                        error!("session[{}] not exists", client_id);
+                LobbyMessage::UnregisterClient { client_id } => {
+                    let Some(client_info) = self.clients.remove(&client_id) else {
+                        error!("client[{}] not exists", client_id);
                         continue;
                     };
 
-                    match session_info.location {
+                    match client_info.location {
                         ClientLocation::AtLobby => todo!(),
                         ClientLocation::AtRoom(_) => todo!(),
                     }

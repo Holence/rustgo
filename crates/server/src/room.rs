@@ -20,7 +20,7 @@ pub struct RoomActor {
     room_name: String,
     host: ClientId, // 房主
 
-    sessions_tx: HashMap<ClientId, mpsc::Sender<DownlinkMessage>>,
+    clients_tx: HashMap<ClientId, mpsc::Sender<DownlinkMessage>>,
 }
 
 impl RoomActor {
@@ -29,7 +29,7 @@ impl RoomActor {
             rx,
             room_name,
             host,
-            sessions_tx: HashMap::new(),
+            clients_tx: HashMap::new(),
         }
     }
 
