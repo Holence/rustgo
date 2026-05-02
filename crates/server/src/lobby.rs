@@ -6,11 +6,12 @@ use tokio::sync::{mpsc, oneshot};
 
 use crate::{
     common::{ChatRecord, ClientId, DownlinkMessage, RoomId, UplinkMessage},
-    room::{self, RoomActor, RoomMessage},
+    room::{RoomActor, RoomMessage},
 };
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 enum ClientLocation {
+    Void,
     AtLobby,
     AtRoom(RoomId),
 }
@@ -37,6 +38,9 @@ pub enum LobbyPartialInfo {
 }
 
 pub enum LobbyMessage {
+    /// send by client when connection established
+    /// - sned `Greeting`
+    /// - mark client in Void
     RegisterClient {
         client_id_tx: oneshot::Sender<ClientId>,
         client_tx: mpsc::Sender<DownlinkMessage>,
@@ -66,44 +70,43 @@ pub struct LobbyActor {
     chats: Vec<ChatRecord>,
 }
 
-macro_rules! check_client_in_lobby {
+macro_rules! check_has_client {
     ($self:expr, $client_id:expr) => {{
         let Some(client_record) = $self.clients.get_mut(&$client_id) else {
             error!("client[{}] not exist", $client_id);
             return;
         };
-
-        if !matches!(client_record.location, ClientLocation::AtLobby) {
-            error!("client[{}] @ {:?}", $client_id, client_record.location);
-            return;
-        }
-
         let client_tx = $self.clients_tx.get(&$client_id).unwrap();
+
         (client_record, client_tx)
     }};
 }
 
+macro_rules! check_client_in_void {
+    ($self:expr, $client_id:expr, $client_record:expr) => {{
+        if !matches!($client_record.location, ClientLocation::Void) {
+            error!("client[{}] @ {:?}", $client_id, $client_record.location);
+            return;
+        }
+    }};
+}
+
+macro_rules! check_client_in_lobby {
+    ($self:expr, $client_id:expr, $client_record:expr) => {{
+        if !matches!($client_record.location, ClientLocation::AtLobby) {
+            error!("client[{}] @ {:?}", $client_id, $client_record.location);
+            return;
+        }
+    }};
+}
+
 macro_rules! check_client_in_room {
-    ($self:expr, $client_id:expr, $room_id:expr) => {{
-        if !$self.rooms.contains_key(&$room_id) {
-            error!("room[{}] not exist", $room_id);
-            return;
-        }
-        assert!($self.rooms_tx.contains_key(&$room_id));
-
-        let Some(client_record) = $self.clients.get_mut(&$client_id) else {
-            error!("client[{}] not exist", $client_id);
-            return;
-        };
-
-        if !matches!(client_record.location, ClientLocation::AtRoom(_id) if _id == $room_id)
+    ($self:expr, $client_id:expr, $client_record:expr, $room_id:expr) => {{
+        if !matches!(&client_record.location, ClientLocation::AtRoom(_id) if _id == $room_id)
         {
-            error!("client[{}] @ {:?}", $client_id, client_record.location);
+            error!("client[{}] @ {:?}", $client_id, &client_record.location);
             return;
         }
-
-        let client_tx = $self.clients_tx.get(&$client_id).unwrap();
-        (client_record, client_tx)
     }};
 }
 
@@ -151,8 +154,25 @@ impl LobbyActor {
             UplinkMessage::Quit { client_id } => {
                 self.clients.remove(&client_id);
             }
+            UplinkMessage::LobbyEnter { client_id, req_id } => {
+                let (client_record, _) = check_has_client!(self, client_id);
+                check_client_in_void!(self, client_id, client_record);
+
+                client_record.location = ClientLocation::AtLobby;
+                self.send_to_client(
+                    client_id,
+                    DownlinkMessage::LobbyEnterAck {
+                        req_id,
+                        success: true,
+                        chats: self.chats.clone(),
+                        rooms: self.rooms.clone(),
+                    },
+                )
+                .await;
+            }
             UplinkMessage::LobbyChat { client_id, content } => {
-                check_client_in_lobby!(self, client_id);
+                let (client_record, _) = check_has_client!(self, client_id);
+                check_client_in_lobby!(self, client_id, client_record);
 
                 info!("client[{client_id}] says '{content}'");
                 self.chats.push(ChatRecord {
@@ -170,9 +190,9 @@ impl LobbyActor {
                 req_id,
                 room_name,
             } => {
-                let (client_record, _) = check_client_in_lobby!(self, client_id);
+                let (client_record, client_tx) = check_has_client!(self, client_id);
+                check_client_in_lobby!(self, client_id, client_record);
 
-                let client_tx = self.clients_tx.get(&client_id).unwrap();
                 let (room_tx, room_rx) = mpsc::channel(32);
                 let room_id = self.next_room_id;
                 self.next_room_id += 1;
@@ -214,7 +234,8 @@ impl LobbyActor {
                 req_id,
                 room_id,
             } => {
-                let (_, client_tx) = check_client_in_room!(self, client_id, room_id);
+                let (client_record, client_tx) = check_has_client!(self, client_id);
+                check_client_in_lobby!(self, client_id, client_record);
                 self.send_to_room(
                     room_id,
                     RoomMessage::Enter {
@@ -258,21 +279,14 @@ impl LobbyActor {
                     self.clients.insert(
                         client_id,
                         ClientRecord {
-                            location: ClientLocation::AtLobby,
+                            location: ClientLocation::Void,
                         },
                     );
                     self.clients_tx.insert(client_id, client_tx);
 
                     client_id_tx.send(client_id).unwrap();
-                    self.send_to_client(
-                        client_id,
-                        DownlinkMessage::Greeting {
-                            client_id,
-                            chats: self.chats.clone(),
-                            rooms: self.rooms.clone(),
-                        },
-                    )
-                    .await;
+                    self.send_to_client(client_id, DownlinkMessage::Greeting { client_id })
+                        .await;
                 }
                 LobbyMessage::UnregisterClient { client_id } => {
                     let Some(client_record) = self.clients.remove(&client_id) else {
@@ -283,12 +297,12 @@ impl LobbyActor {
                     self.clients_tx.remove(&client_id);
 
                     match client_record.location {
-                        ClientLocation::AtLobby => {
-                            info!("client[{}] leaves", client_id);
-                        }
                         ClientLocation::AtRoom(room_id) => {
                             self.send_to_room(room_id, RoomMessage::Quit(client_id))
                                 .await;
+                        }
+                        _ => {
+                            info!("client[{}] leaves", client_id);
                         }
                     }
                 }

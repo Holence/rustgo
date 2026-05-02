@@ -24,21 +24,19 @@ pub struct ChatRecord {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum DownlinkMessage {
+    /// trigger by `RegisterClient`
     Greeting {
         client_id: ClientId,
+    },
+    PingEcho,
+
+    /// trigger by `LobbyEnter`
+    LobbyEnterAck {
+        req_id: ReqId,
+        success: bool,
         chats: Vec<ChatRecord>,
         rooms: HashMap<RoomId, RoomRecord>,
     },
-    PingEcho,
-    Shutdown,
-
-    // TODO
-    // LobbyEnterAck {
-    //     req_id: ReqId,
-    //     success: bool,
-    //     chats: Vec<ChatRecord>,
-    //     rooms: HashMap<RoomId, RoomRecord>,
-    // },
 
     // TODO split LobbyPartialInfo
     LobbyUpdate {
@@ -74,6 +72,14 @@ pub enum UplinkMessage {
     },
     Quit {
         client_id: ClientId,
+    },
+
+    /// if client in Void
+    /// - send `LobbyEnterAck`
+    /// - mark client in Lobby
+    LobbyEnter {
+        client_id: ClientId,
+        req_id: ReqId,
     },
 
     /// if client in lobby, then

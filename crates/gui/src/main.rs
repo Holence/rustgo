@@ -86,10 +86,16 @@ impl App {
         }
     }
 
-    fn next_req(&mut self) -> ReqId {
-        let id = self.next_req_id;
+    fn next_req(&mut self, description: String) -> ReqId {
+        assert!(self.pending.is_none());
+
+        let req_id = self.next_req_id;
+        self.pending = Some(Pending {
+            req_id,
+            description,
+        });
         self.next_req_id += 1;
-        id
+        return req_id;
     }
 
     fn change_state(&mut self, state: ViewState) {
@@ -144,28 +150,39 @@ impl App {
                 NetworkTaskEvent::Disconnected => {
                     self.change_state(ViewState::Home);
                 }
-                NetworkTaskEvent::Recv(DownlinkMessage::Greeting {
-                    client_id,
-                    chats,
-                    rooms,
-                }) => {
-                    self.client_id = Some(client_id);
-                    self.change_state(ViewState::Lobby(LobbyState::new(chats, rooms)));
-                }
-                _ => unreachable!(),
+                NetworkTaskEvent::Recv(msg) => match msg {
+                    DownlinkMessage::Greeting { client_id } => {
+                        self.client_id = Some(client_id);
+
+                        let req_id = self.next_req("Going To Lobby".to_string());
+                        self.send(UplinkMessage::LobbyEnter { client_id, req_id });
+                    }
+                    DownlinkMessage::LobbyEnterAck {
+                        req_id,
+                        success,
+                        chats,
+                        rooms,
+                    } => {
+                        if self.pending_matches(req_id) && success {
+                            self.change_state(ViewState::Lobby(LobbyState::new(chats, rooms)));
+                        }
+                    }
+                    _ => unreachable!("{:?}", msg),
+                },
+                _ => unreachable!("{:?}", event),
             }
         }
     }
 
     fn ui_going_to_lobby(&mut self, ui: &mut egui::Ui) -> Option<UiAction> {
         let action: Option<UiAction> = None;
-        ui.heading("Going To Lobby...");
+        ui.label(format!("client_id: {:?}", self.client_id));
         return action;
     }
 
     fn handle_lobby(&mut self) {
         let ViewState::Lobby(lobby_state) = &mut self.state else {
-            unreachable!()
+            unreachable!("{:?}", self.state)
         };
 
         if let Ok(event) = self.rx_msg.try_recv() {
@@ -173,37 +190,40 @@ impl App {
                 NetworkTaskEvent::Disconnected => {
                     self.change_state(ViewState::Home);
                 }
-                NetworkTaskEvent::Recv(DownlinkMessage::LobbyUpdate { info }) => match info {
-                    LobbyPartialInfo::Chat(chat_record) => {
-                        lobby_state.chats.push(chat_record);
-                    }
-                    LobbyPartialInfo::Room {
-                        room_id,
-                        room_record,
-                    } => {
-                        lobby_state.rooms.insert(room_id, room_record);
-                    }
-                },
-                NetworkTaskEvent::Recv(DownlinkMessage::LobbyCreateRoomAck { req_id, room_id }) => {
-                    if self.pending_matches(req_id) {
-                        self.pending = None;
-                        if let Some(room_id) = room_id {
-                            self.change_state(ViewState::Room(RoomState {
-                                room_id,
-                                chat_input: String::new(),
-                                chats: vec![],
-                            }));
+                NetworkTaskEvent::Recv(msg) => match msg {
+                    DownlinkMessage::LobbyUpdate { info } => match info {
+                        LobbyPartialInfo::Chat(chat_record) => {
+                            lobby_state.chats.push(chat_record);
+                        }
+                        LobbyPartialInfo::Room {
+                            room_id,
+                            room_record,
+                        } => {
+                            lobby_state.rooms.insert(room_id, room_record);
+                        }
+                    },
+                    DownlinkMessage::LobbyCreateRoomAck { req_id, room_id } => {
+                        if self.pending_matches(req_id) {
+                            self.pending = None;
+                            if let Some(room_id) = room_id {
+                                self.change_state(ViewState::Room(RoomState {
+                                    room_id,
+                                    chat_input: String::new(),
+                                    chats: vec![],
+                                }));
+                            }
                         }
                     }
-                }
-                _ => unreachable!(),
+                    _ => unreachable!("{:?}", msg),
+                },
+                _ => unreachable!("{:?}", event),
             }
         }
     }
 
     fn ui_lobby(&mut self, ui: &mut egui::Ui) -> Option<UiAction> {
         let ViewState::Lobby(lobby_state) = &mut self.state else {
-            unreachable!()
+            unreachable!("{:?}", self.state)
         };
 
         let mut action: Option<UiAction> = None;
@@ -270,7 +290,7 @@ impl App {
 
     fn handle_room(&mut self) {
         let ViewState::Room(room_state) = &mut self.state else {
-            unreachable!()
+            unreachable!("{:?}", self.state)
         };
 
         if let Ok(event) = self.rx_msg.try_recv() {
@@ -278,20 +298,19 @@ impl App {
                 NetworkTaskEvent::Disconnected => {
                     self.change_state(ViewState::Home);
                 }
-                NetworkTaskEvent::Recv(DownlinkMessage::RoomEnterAck {
-                    req_id,
-                    success,
-                    room_id,
-                }) => {
-                    todo!()
-                }
-                NetworkTaskEvent::Recv(DownlinkMessage::RoomChat {
-                    room_id,
-                    client_id,
-                    content,
-                }) => {
-                    todo!()
-                }
+                NetworkTaskEvent::Recv(msg) => match msg {
+                    DownlinkMessage::RoomEnterAck {
+                        req_id,
+                        success,
+                        room_id,
+                    } => todo!(),
+                    DownlinkMessage::RoomChat {
+                        room_id,
+                        client_id,
+                        content,
+                    } => todo!(),
+                    _ => unreachable!("{:?}", msg),
+                },
                 _ => unreachable!("{:?}", event),
             }
         }
@@ -381,11 +400,7 @@ impl eframe::App for App {
                     });
                 }
                 UiAction::CreateRoom(room_name) => {
-                    let req_id = self.next_req();
-                    self.pending = Some(Pending {
-                        req_id,
-                        description: "Create Room".to_string(),
-                    });
+                    let req_id = self.next_req("Create Room".to_string());
                     self.send(UplinkMessage::LobbyCreateRoom {
                         client_id: self.client_id.unwrap(),
                         req_id,
