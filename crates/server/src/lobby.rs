@@ -5,21 +5,9 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, oneshot};
 
 use crate::{
-    common::{ClientId, DownlinkMessage, RoomId, UplinkMessage},
-    room::{RoomActor, RoomMessage},
+    common::{ChatRecord, ClientId, DownlinkMessage, RoomId, UplinkMessage},
+    room::{self, RoomActor, RoomMessage},
 };
-
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct ChatRecord {
-    pub client_id: ClientId,
-    pub content: String,
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct RoomRecord {
-    pub room_name: String,
-    // room_state // state: Teaming/GameStart/GameEnd
-}
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 enum ClientLocation {
@@ -31,6 +19,12 @@ enum ClientLocation {
 struct ClientRecord {
     location: ClientLocation,
     // name
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct RoomRecord {
+    pub room_name: String,
+    // room_state // state: Teaming/GameStart/GameEnd
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -84,7 +78,32 @@ macro_rules! check_client_in_lobby {
             return;
         }
 
-        client_record
+        let client_tx = $self.clients_tx.get(&$client_id).unwrap();
+        (client_record, client_tx)
+    }};
+}
+
+macro_rules! check_client_in_room {
+    ($self:expr, $client_id:expr, $room_id:expr) => {{
+        if !$self.rooms.contains_key(&$room_id) {
+            error!("room[{}] not exist", $room_id);
+            return;
+        }
+        assert!($self.rooms_tx.contains_key(&$room_id));
+
+        let Some(client_record) = $self.clients.get_mut(&$client_id) else {
+            error!("client[{}] not exist", $client_id);
+            return;
+        };
+
+        if !matches!(client_record.location, ClientLocation::AtRoom(_id) if _id == $room_id)
+        {
+            error!("client[{}] @ {:?}", $client_id, client_record.location);
+            return;
+        }
+
+        let client_tx = $self.clients_tx.get(&$client_id).unwrap();
+        (client_record, client_tx)
     }};
 }
 
@@ -151,16 +170,23 @@ impl LobbyActor {
                 req_id,
                 room_name,
             } => {
-                let client_record = check_client_in_lobby!(self, client_id);
+                let (client_record, _) = check_client_in_lobby!(self, client_id);
 
                 let client_tx = self.clients_tx.get(&client_id).unwrap();
                 let (room_tx, room_rx) = mpsc::channel(32);
-                tokio::spawn(
-                    RoomActor::new(room_rx, room_name.clone(), client_id, client_tx.clone()).run(),
-                );
-
                 let room_id = self.next_room_id;
                 self.next_room_id += 1;
+                tokio::spawn(
+                    RoomActor::new(
+                        room_rx,
+                        room_id,
+                        room_name.clone(),
+                        client_id,
+                        client_tx.clone(),
+                    )
+                    .run(),
+                );
+
                 let room_record = RoomRecord { room_name };
                 self.rooms.insert(room_id, room_record.clone());
                 self.rooms_tx.insert(room_id, room_tx);
@@ -187,7 +213,18 @@ impl LobbyActor {
                 client_id,
                 req_id,
                 room_id,
-            } => todo!(),
+            } => {
+                let (_, client_tx) = check_client_in_room!(self, client_id, room_id);
+                self.send_to_room(
+                    room_id,
+                    RoomMessage::Enter {
+                        req_id,
+                        client_id,
+                        client_tx: client_tx.clone(),
+                    },
+                )
+                .await
+            }
             UplinkMessage::RoomChat {
                 client_id,
                 room_id,

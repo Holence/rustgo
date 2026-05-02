@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use rustgo::{Coord, Stone};
 use serde::{Deserialize, Serialize};
 
-use crate::lobby::{ChatRecord, LobbyPartialInfo, RoomRecord};
+use crate::lobby::{LobbyPartialInfo, RoomRecord};
 
 pub type ClientId = u64;
 pub type RoomId = u64;
@@ -17,6 +17,12 @@ pub enum Action {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct ChatRecord {
+    pub client_id: ClientId,
+    pub content: String,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum DownlinkMessage {
     Greeting {
         client_id: ClientId,
@@ -26,6 +32,15 @@ pub enum DownlinkMessage {
     PingEcho,
     Shutdown,
 
+    // TODO
+    // LobbyEnterAck {
+    //     req_id: ReqId,
+    //     success: bool,
+    //     chats: Vec<ChatRecord>,
+    //     rooms: HashMap<RoomId, RoomRecord>,
+    // },
+
+    // TODO split LobbyPartialInfo
     LobbyUpdate {
         info: LobbyPartialInfo,
     },
@@ -38,13 +53,14 @@ pub enum DownlinkMessage {
         req_id: ReqId,
         success: bool,
         room_id: RoomId,
+        // TODO chats
+        // TODO clients
     },
     RoomChat {
         room_id: RoomId,
         client_id: ClientId,
         content: String,
     },
-    RoomQuitAck,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]

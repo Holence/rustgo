@@ -1,7 +1,7 @@
 use gui::network_task::{NetworkTaskCmd, NetworkTaskEvent, network_task};
 use server::{
-    common::{ClientId, DownlinkMessage, ReqId, RoomId, UplinkMessage},
-    lobby::{ChatRecord, LobbyPartialInfo, RoomRecord},
+    common::{ChatRecord, ClientId, DownlinkMessage, ReqId, RoomId, UplinkMessage},
+    lobby::{LobbyPartialInfo, RoomRecord},
 };
 use std::{collections::HashMap, fmt::Debug};
 use tokio::sync::mpsc;
@@ -290,9 +290,6 @@ impl App {
                     client_id,
                     content,
                 }) => {
-                    todo!()
-                }
-                NetworkTaskEvent::Recv(DownlinkMessage::RoomQuitAck) => {
                     todo!()
                 }
                 _ => unreachable!("{:?}", event),
