@@ -59,15 +59,26 @@ pub enum UplinkMessage {
     Quit {
         client_id: ClientId,
     },
+
+    /// if client in lobby, then
+    /// - record chat
+    /// - broadcast `LobbyPartialInfo::Chat`
     LobbyChat {
         client_id: ClientId,
         content: String,
     },
+
+    /// if client in lobby, then
+    /// - create Room with host=client
+    /// - mark client in Room
+    /// - send `LobbyCreateRoomAck`
+    /// - broadcast `LobbyPartialInfo::Room`
     LobbyCreateRoom {
         client_id: ClientId,
         req_id: ReqId,
         room_name: String,
     },
+
     RoomEnter {
         client_id: ClientId,
         req_id: ReqId,

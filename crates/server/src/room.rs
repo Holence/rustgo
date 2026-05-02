@@ -18,28 +18,35 @@ pub enum RoomMessage {
 pub struct RoomActor {
     rx: mpsc::Receiver<RoomMessage>,
     room_name: String,
-    host: ClientId, // 房主
+    host_id: ClientId, // 房主
 
     clients_tx: HashMap<ClientId, mpsc::Sender<DownlinkMessage>>,
 }
 
 impl RoomActor {
-    pub fn new(rx: mpsc::Receiver<RoomMessage>, room_name: String, host: ClientId) -> Self {
+    pub fn new(
+        rx: mpsc::Receiver<RoomMessage>,
+        room_name: String,
+        host_id: ClientId,
+        host_tx: mpsc::Sender<DownlinkMessage>,
+    ) -> Self {
+        let mut clients_tx = HashMap::new();
+        clients_tx.insert(host_id, host_tx);
         Self {
             rx,
             room_name,
-            host,
-            clients_tx: HashMap::new(),
+            host_id,
+            clients_tx,
         }
     }
 
     pub async fn run(mut self) {
         while let Some(msg) = self.rx.recv().await {
             match msg {
-                RoomMessage::Enter(_, sender) => todo!(),
+                RoomMessage::Enter(client_id, sender) => {}
                 RoomMessage::RoomChat(_, _) => todo!(),
                 RoomMessage::Quit(client_id) => {
-                    self.clients_tx.remove(&client_id);
+                    self.clients_tx.remove(&client_id).unwrap();
                 }
             }
         }
