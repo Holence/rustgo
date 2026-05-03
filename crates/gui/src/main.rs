@@ -1,7 +1,7 @@
 use gui::network_task::{NetworkTaskCmd, NetworkTaskEvent, network_task};
 use server::{
     common::{ChatRecord, ClientId, DownlinkMessage, ReqId, RoomId, UplinkMessage},
-    lobby::{LobbyPartialInfo, RoomRecord},
+    lobby::RoomRecord,
 };
 use std::{collections::HashMap, fmt::Debug};
 use tokio::sync::mpsc;
@@ -33,7 +33,7 @@ impl LobbyState {
 struct RoomState {
     pub(crate) room_id: RoomId,
     pub(crate) chat_input: String,
-    pub(crate) chats: Vec<String>,
+    pub(crate) chats: Vec<ChatRecord>,
 }
 
 #[derive(Debug, Clone)]
@@ -56,9 +56,8 @@ enum UiAction {
     Disconnect,
     SendLobbyChat(String),
     CreateRoom(String),
+    EnterRoom(RoomId),
     SendRoomChat(String),
-    // future:
-    // EnterRoom(RoomId),
 }
 
 pub struct App {
@@ -163,8 +162,12 @@ impl App {
                         chats,
                         rooms,
                     } => {
-                        if self.pending_matches(req_id) && success {
-                            self.change_state(ViewState::Lobby(LobbyState::new(chats, rooms)));
+                        if self.pending_matches(req_id) {
+                            if success {
+                                self.change_state(ViewState::Lobby(LobbyState::new(chats, rooms)));
+                            } else {
+                                todo!()
+                            }
                         }
                     }
                     _ => unreachable!("{:?}", msg),
@@ -191,26 +194,38 @@ impl App {
                     self.change_state(ViewState::Home);
                 }
                 NetworkTaskEvent::Recv(msg) => match msg {
-                    DownlinkMessage::LobbyUpdate { info } => match info {
-                        LobbyPartialInfo::Chat(chat_record) => {
-                            lobby_state.chats.push(chat_record);
-                        }
-                        LobbyPartialInfo::Room {
-                            room_id,
-                            room_record,
-                        } => {
-                            lobby_state.rooms.insert(room_id, room_record);
-                        }
-                    },
+                    DownlinkMessage::LobbyChatUpdate { chat_record } => {
+                        lobby_state.chats.push(chat_record);
+                    }
+                    DownlinkMessage::LobbyRoomUpdate { room_record } => {
+                        lobby_state.rooms.insert(room_record.room_id, room_record);
+                    }
                     DownlinkMessage::LobbyCreateRoomAck { req_id, room_id } => {
+                        if self.pending_matches(req_id)
+                            && let Some(room_id) = room_id
+                        {
+                            self.change_state(ViewState::Room(RoomState {
+                                room_id,
+                                chat_input: String::new(),
+                                chats: vec![],
+                            }));
+                        }
+                    }
+                    DownlinkMessage::RoomEnterAck {
+                        req_id,
+                        success,
+                        room_id,
+                        chats,
+                    } => {
                         if self.pending_matches(req_id) {
-                            self.pending = None;
-                            if let Some(room_id) = room_id {
+                            if success {
                                 self.change_state(ViewState::Room(RoomState {
                                     room_id,
                                     chat_input: String::new(),
-                                    chats: vec![],
+                                    chats,
                                 }));
+                            } else {
+                                todo!()
                             }
                         }
                     }
@@ -257,6 +272,9 @@ impl App {
 
         for (room_id, room_record) in &lobby_state.rooms {
             ui.label(format!("room[{}]: {}", room_id, room_record.room_name));
+            if ui.button("Enter").clicked() {
+                action = Some(UiAction::EnterRoom(*room_id));
+            }
         }
 
         if lobby_state.create_room_dialog_open {
@@ -299,16 +317,14 @@ impl App {
                     self.change_state(ViewState::Home);
                 }
                 NetworkTaskEvent::Recv(msg) => match msg {
-                    DownlinkMessage::RoomEnterAck {
-                        req_id,
-                        success,
-                        room_id,
-                    } => todo!(),
                     DownlinkMessage::RoomChat {
                         room_id,
                         client_id,
                         content,
-                    } => todo!(),
+                    } => {
+                        assert!(room_id == room_state.room_id);
+                        room_state.chats.push(ChatRecord { client_id, content });
+                    }
                     _ => unreachable!("{:?}", msg),
                 },
                 _ => unreachable!("{:?}", event),
@@ -340,8 +356,11 @@ impl App {
             action = Some(UiAction::SendRoomChat(content));
         }
 
-        for line in &room_state.chats {
-            ui.label(line);
+        for chat_record in &room_state.chats {
+            ui.label(format!(
+                "client[{}]: {}",
+                chat_record.client_id, chat_record.content
+            ));
         }
 
         return action;
@@ -415,6 +434,17 @@ impl eframe::App for App {
                         client_id: self.client_id.unwrap(),
                         room_id: room_state.room_id,
                         content,
+                    });
+                }
+                UiAction::EnterRoom(room_id) => {
+                    if !matches!(self.state, ViewState::Lobby(_)) {
+                        unreachable!()
+                    };
+                    let req_id = self.next_req("Enter Room".to_string());
+                    self.send(UplinkMessage::RoomEnter {
+                        client_id: self.client_id.unwrap(),
+                        req_id,
+                        room_id,
                     });
                 }
             }

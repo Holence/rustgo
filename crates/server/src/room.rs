@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use log::error;
 use tokio::sync::mpsc;
 
-use crate::common::{ClientId, DownlinkMessage, ReqId, RoomId};
+use crate::common::{ChatRecord, ClientId, DownlinkMessage, ReqId, RoomId};
 
 use serde::{Deserialize, Serialize};
 
@@ -21,7 +21,10 @@ pub enum RoomMessage {
         client_id: ClientId,
         client_tx: mpsc::Sender<DownlinkMessage>,
     },
-    RoomChat(ClientId, String),
+    RoomChat {
+        client_id: ClientId,
+        content: String,
+    },
     // TODO CreateTeam(PlayerId)
     // TODO JoinTeam(PlayerId, TeamId)
     // TODO LeaveTeam(PlayerId, TeamId)
@@ -36,6 +39,8 @@ pub struct RoomActor {
 
     clients: HashMap<ClientId, ClientRecord>,
     clients_tx: HashMap<ClientId, mpsc::Sender<DownlinkMessage>>,
+
+    chats: Vec<ChatRecord>,
 }
 
 impl RoomActor {
@@ -57,6 +62,7 @@ impl RoomActor {
             host_id,
             clients,
             clients_tx,
+            chats: vec![],
         }
     }
 
@@ -65,6 +71,13 @@ impl RoomActor {
             client_tx.send(msg).await.unwrap();
         } else {
             error!("client[{client_id}] not exist");
+        }
+    }
+
+    async fn broadcast(&self, msg: DownlinkMessage) {
+        for (client_id, client_record) in &self.clients {
+            let client_tx = self.clients_tx.get(client_id).unwrap();
+            client_tx.send(msg.clone()).await.unwrap();
         }
     }
 
@@ -91,14 +104,28 @@ impl RoomActor {
                             req_id,
                             success: true,
                             room_id: self.room_id,
+                            chats: self.chats.clone(),
                         },
                     )
                     .await;
 
                     // TODO boardcast ClientRecord
                 }
-                RoomMessage::RoomChat(_, _) => todo!(),
+                RoomMessage::RoomChat { client_id, content } => {
+                    self.chats.push(ChatRecord {
+                        client_id,
+                        content: content.clone(),
+                    });
+
+                    self.broadcast(DownlinkMessage::RoomChat {
+                        room_id: self.room_id,
+                        client_id,
+                        content,
+                    })
+                    .await;
+                }
                 RoomMessage::Quit(client_id) => {
+                    self.clients.remove(&client_id).unwrap();
                     self.clients_tx.remove(&client_id).unwrap();
                 }
             }

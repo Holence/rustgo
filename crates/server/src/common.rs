@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use rustgo::{Coord, Stone};
 use serde::{Deserialize, Serialize};
 
-use crate::lobby::{LobbyPartialInfo, RoomRecord};
+use crate::lobby::RoomRecord;
 
 pub type ClientId = u64;
 pub type RoomId = u64;
@@ -38,9 +38,13 @@ pub enum DownlinkMessage {
         rooms: HashMap<RoomId, RoomRecord>,
     },
 
-    // TODO split LobbyPartialInfo
-    LobbyUpdate {
-        info: LobbyPartialInfo,
+    /// trigger by `LobbyChat`
+    LobbyChatUpdate {
+        chat_record: ChatRecord,
+    },
+
+    LobbyRoomUpdate {
+        room_record: RoomRecord,
     },
 
     LobbyCreateRoomAck {
@@ -51,7 +55,7 @@ pub enum DownlinkMessage {
         req_id: ReqId,
         success: bool,
         room_id: RoomId,
-        // TODO chats
+        chats: Vec<ChatRecord>,
         // TODO clients
     },
     RoomChat {
@@ -84,7 +88,7 @@ pub enum UplinkMessage {
 
     /// if client in lobby, then
     /// - record chat
-    /// - broadcast `LobbyPartialInfo::Chat`
+    /// - broadcast `LobbyChatUpdate`
     LobbyChat {
         client_id: ClientId,
         content: String,
@@ -94,13 +98,17 @@ pub enum UplinkMessage {
     /// - create Room with host=client
     /// - mark client in Room
     /// - send `LobbyCreateRoomAck`
-    /// - broadcast `LobbyPartialInfo::Room`
+    /// - broadcast `LobbyRoomUpdate`
     LobbyCreateRoom {
         client_id: ClientId,
         req_id: ReqId,
         room_name: String,
     },
 
+    /// if client in lobby && has room, then
+    /// - mark client in Room
+    /// - send `RoomEnterAck`
+    /// - broadcast `LobbyRoomUpdate`
     RoomEnter {
         client_id: ClientId,
         req_id: ReqId,
