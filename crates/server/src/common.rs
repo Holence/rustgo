@@ -28,7 +28,7 @@ pub enum DownlinkMessage {
     Greeting {
         client_id: ClientId,
     },
-    PingEcho,
+    Pong,
 
     /// trigger by `LobbyEnter`
     LobbyEnterAck {
@@ -73,9 +73,6 @@ pub enum UplinkMessage {
     Ping {
         client_id: ClientId,
         req_id: ReqId,
-    },
-    Quit {
-        client_id: ClientId,
     },
 
     /// if client in Void

@@ -157,9 +157,6 @@ impl LobbyActor {
     async fn handle_msg(&mut self, msg: UplinkMessage) {
         match msg {
             UplinkMessage::Ping { client_id, req_id } => todo!(),
-            UplinkMessage::Quit { client_id } => {
-                self.clients.remove(&client_id);
-            }
             UplinkMessage::LobbyEnter { client_id, req_id } => {
                 let (client_record, client_tx) = check_has_client!(self, client_id);
                 check_client_in_void!(self, client_id, client_record);

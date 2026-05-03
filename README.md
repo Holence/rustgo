@@ -28,12 +28,7 @@ Server
 - [x] 上tokio
 - [x] `Server = Game + Vec<TeamHandle<Vec<PlayerHandle>>>`，用channel传递ServerMessage/PlayerMessage
 - [x] 简易的 egui 界面，可以展示多色棋组队对战效果
-- [ ] Server搭建Actor Model，模拟PlayerMessage流入Lobby/Room/Game后的处理
-- [ ] client上传事件后需要等server返回ack，gui里的state为pending
-- [ ] 进入Room后ack当前完整状态, 后续的状态更新, 返回 update info (add/remove)
-- [ ] GUI Client实现Lobby/Room/Game
-- [ ] 区分掉线导致的 LobbyMessage::UnregisterSession 与 主动的Quit
-- [ ] Server支持TCP连接
+- [ ] Server、GUI Client实现Lobby/Room/Game
 - [ ] ...
 - [ ] HTTP+WebSocket???
 
@@ -48,6 +43,8 @@ Server
 - TUI
 - 削减pub
 - 聊天中 Bot名字+闭嘴
+- server
+  - ctrl+c 优雅退出
 - http+DB (信息CRUD) + websocket (对战Actor Model)
   - server axum
   - client reqwest+tokio-tungstenite?

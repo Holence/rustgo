@@ -15,7 +15,6 @@ struct ClientRecord {
 
 #[derive(Clone)]
 pub enum RoomMessage {
-    // TODO RoomInfo(RoomId, Vec<TeamInfo>) // downlink only
     Enter {
         req_id: ReqId,
         client_id: ClientId,
