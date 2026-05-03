@@ -67,6 +67,7 @@ impl ClientActor {
             match serde_json::from_str::<UplinkMessage>(&line) {
                 Ok(msg) => {
                     // TODO some check and filter for malicious package?
+                    // client_id must equal to self.client_id
                     lobby_tx
                         .send(LobbyMessage::ClientMessage { msg })
                         .await

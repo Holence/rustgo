@@ -365,6 +365,55 @@ impl App {
 
         return action;
     }
+
+    fn execute_action(&mut self, action: UiAction) {
+        match (&self.state, action) {
+            (ViewState::Home, UiAction::Connect) => {
+                self.connect();
+            }
+
+            (ViewState::Lobby(_) | ViewState::Room(_), UiAction::Disconnect) => {
+                self.disconnect();
+            }
+
+            (ViewState::Lobby(_), UiAction::SendLobbyChat(content)) => {
+                self.send(UplinkMessage::LobbyChat {
+                    client_id: self.client_id.unwrap(),
+                    content,
+                });
+            }
+
+            (ViewState::Lobby(_), UiAction::CreateRoom(room_name)) => {
+                let req_id = self.next_req("Create Room".to_string());
+                self.send(UplinkMessage::LobbyCreateRoom {
+                    client_id: self.client_id.unwrap(),
+                    req_id,
+                    room_name,
+                });
+            }
+
+            (ViewState::Room(room_state), UiAction::SendRoomChat(content)) => {
+                self.send(UplinkMessage::RoomChat {
+                    client_id: self.client_id.unwrap(),
+                    room_id: room_state.room_id,
+                    content,
+                });
+            }
+
+            (ViewState::Lobby(_), UiAction::EnterRoom(room_id)) => {
+                let req_id = self.next_req("Enter Room".to_string());
+                self.send(UplinkMessage::RoomEnter {
+                    client_id: self.client_id.unwrap(),
+                    req_id,
+                    room_id,
+                });
+            }
+
+            (state, action) => {
+                eprintln!("error state[{:?}] action[{:?}] ", state, action);
+            }
+        }
+    }
 }
 
 impl eframe::App for App {
@@ -401,53 +450,8 @@ impl eframe::App for App {
         // 3. Execute action
         // -------------------------
 
-        // TODO 一堆乱七八糟的action在这里还要区分state才能处理？
         if let Some(action) = action {
-            match action {
-                UiAction::Connect => {
-                    self.connect();
-                }
-
-                UiAction::Disconnect => {
-                    self.disconnect();
-                }
-
-                UiAction::SendLobbyChat(content) => {
-                    self.send(UplinkMessage::LobbyChat {
-                        client_id: self.client_id.unwrap(),
-                        content,
-                    });
-                }
-                UiAction::CreateRoom(room_name) => {
-                    let req_id = self.next_req("Create Room".to_string());
-                    self.send(UplinkMessage::LobbyCreateRoom {
-                        client_id: self.client_id.unwrap(),
-                        req_id,
-                        room_name,
-                    });
-                }
-                UiAction::SendRoomChat(content) => {
-                    let ViewState::Room(room_state) = &self.state else {
-                        unreachable!()
-                    };
-                    self.send(UplinkMessage::RoomChat {
-                        client_id: self.client_id.unwrap(),
-                        room_id: room_state.room_id,
-                        content,
-                    });
-                }
-                UiAction::EnterRoom(room_id) => {
-                    if !matches!(self.state, ViewState::Lobby(_)) {
-                        unreachable!()
-                    };
-                    let req_id = self.next_req("Enter Room".to_string());
-                    self.send(UplinkMessage::RoomEnter {
-                        client_id: self.client_id.unwrap(),
-                        req_id,
-                        room_id,
-                    });
-                }
-            }
+            self.execute_action(action);
         }
 
         ui.request_repaint();

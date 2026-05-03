@@ -74,8 +74,7 @@ impl RoomActor {
     }
 
     async fn broadcast(&self, msg: DownlinkMessage) {
-        for (client_id, client_record) in &self.clients {
-            let client_tx = self.clients_tx.get(client_id).unwrap();
+        for client_tx in self.clients_tx.values() {
             client_tx.send(msg.clone()).await.unwrap();
         }
     }
