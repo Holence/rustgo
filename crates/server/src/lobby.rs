@@ -17,17 +17,17 @@ enum ClientLocation {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
-struct ClientRecord {
+struct LobbyClientRecord {
     location: ClientLocation,
     username: String,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct RoomRecord {
+pub struct LobbyRoomRecord {
     pub room_id: RoomId,
     pub room_name: String,
     pub client_nums: usize,
-    // room_state // state: Teaming/GameStart/GameEnd
+    // TODO room_state: GameState
 }
 
 pub enum LobbyMessage {
@@ -42,18 +42,22 @@ pub enum LobbyMessage {
     ClientMessage {
         msg: UplinkMessage,
     },
-    // TODO room update
-    // RoomStateUpdate
-    // RoomActionUpdate
+    // TODO RoomStateUpdate
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct LobbySnapshot {
+    pub chats: Vec<ChatRecord>,
+    pub rooms: HashMap<RoomId, LobbyRoomRecord>,
 }
 
 pub struct LobbyActor {
     rx: mpsc::Receiver<LobbyMessage>,
 
-    clients: HashMap<ClientId, ClientRecord>,
+    clients: HashMap<ClientId, LobbyClientRecord>,
     clients_tx: HashMap<ClientId, mpsc::Sender<DownlinkMessage>>,
 
-    rooms: HashMap<RoomId, RoomRecord>,
+    rooms: HashMap<RoomId, LobbyRoomRecord>,
     rooms_tx: HashMap<ClientId, mpsc::Sender<RoomMessage>>,
 
     next_client_id: ClientId,
@@ -139,7 +143,7 @@ impl LobbyActor {
     async fn handle_msg(&mut self, msg: UplinkMessage) {
         match msg {
             UplinkMessage::Login { .. } => unreachable!(),
-            UplinkMessage::Ping { client_id, req_id } => todo!(),
+            UplinkMessage::Ping { .. } => unreachable!(),
             UplinkMessage::LobbyEnter { client_id, req_id } => {
                 if !self.ensure_client_location(client_id, ClientLocation::Void) {
                     error!("");
@@ -152,8 +156,10 @@ impl LobbyActor {
                     DownlinkMessage::LobbyEnterAck {
                         req_id,
                         success: true,
-                        chats: self.chats.clone(),
-                        rooms: self.rooms.clone(),
+                        lobby_snapshot: LobbySnapshot {
+                            chats: self.chats.clone(),
+                            rooms: self.rooms.clone(),
+                        },
                     },
                 )
                 .await;
@@ -187,19 +193,16 @@ impl LobbyActor {
                 let (room_tx, room_rx) = mpsc::channel(32);
                 let room_id = self.next_room_id;
                 self.next_room_id += 1;
-                tokio::spawn(
-                    RoomActor::new(
-                        room_rx,
-                        room_id,
-                        room_name.clone(),
-                        client_id,
-                        self.client_username_cloned(client_id),
-                        self.client_tx_cloned(client_id),
-                    )
-                    .run(),
+                let room_actor = RoomActor::new(
+                    room_rx,
+                    room_id,
+                    room_name.clone(),
+                    client_id,
+                    self.client_username_cloned(client_id),
+                    self.client_tx_cloned(client_id),
                 );
 
-                let room_record = RoomRecord {
+                let room_record = LobbyRoomRecord {
                     room_id,
                     room_name,
                     client_nums: 1,
@@ -212,12 +215,15 @@ impl LobbyActor {
                     client_id,
                     DownlinkMessage::LobbyCreateRoomAck {
                         req_id,
-                        room_id: Some(room_id),
+                        success: true,
+                        room_snapshot: room_actor.get_snapshot(),
                     },
                 )
                 .await;
                 self.broadcast(DownlinkMessage::LobbyRoomUpdate { room_record })
                     .await;
+
+                tokio::spawn(room_actor.run());
             }
             UplinkMessage::RoomEnter {
                 client_id,
@@ -242,8 +248,8 @@ impl LobbyActor {
                 self.send_to_room(
                     room_id,
                     RoomMessage::Enter {
-                        req_id,
                         client_id,
+                        req_id,
                         username: self.client_username_cloned(client_id),
                         client_tx: self.client_tx_cloned(client_id),
                     },
@@ -252,6 +258,12 @@ impl LobbyActor {
                 self.broadcast(DownlinkMessage::LobbyRoomUpdate { room_record })
                     .await;
             }
+            UplinkMessage::RoomChangeTeam {
+                client_id,
+                req_id,
+                room_id,
+                team,
+            } => todo!(),
             UplinkMessage::RoomChat {
                 client_id,
                 room_id,
@@ -262,7 +274,7 @@ impl LobbyActor {
                     return;
                 }
 
-                self.send_to_room(room_id, RoomMessage::RoomChat { client_id, content })
+                self.send_to_room(room_id, RoomMessage::Chat { client_id, content })
                     .await;
             }
             UplinkMessage::RoomQuit {
@@ -303,7 +315,7 @@ impl LobbyActor {
 
                     self.clients.insert(
                         client_id,
-                        ClientRecord {
+                        LobbyClientRecord {
                             location: ClientLocation::Void,
                             username,
                         },

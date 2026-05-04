@@ -2685,6 +2685,8 @@ dependencies = [
  "criterion",
  "cursive",
  "rand",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

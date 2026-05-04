@@ -1,6 +1,8 @@
 use std::fmt::{Debug, Display, Write};
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Stone(u8);
 
 static LUT: &[char] = &['_', '●', '○', '$', '#', '&', '@'];

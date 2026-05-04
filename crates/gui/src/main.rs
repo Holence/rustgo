@@ -1,7 +1,8 @@
 use gui::network_task::{NetworkTaskCmd, NetworkTaskEvent, network_task};
 use server::{
     common::{ChatRecord, ClientId, DownlinkMessage, ReqId, RoomId, UplinkMessage},
-    lobby::RoomRecord,
+    lobby::LobbyRoomRecord,
+    room::RoomClientRecord,
 };
 use std::{collections::HashMap, fmt::Debug};
 use tokio::sync::mpsc;
@@ -17,7 +18,7 @@ struct LobbyState {
     pub(crate) client_id: ClientId,
     pub(crate) chat_input: String,
     pub(crate) chats: Vec<ChatRecord>,
-    pub(crate) rooms: HashMap<RoomId, RoomRecord>,
+    pub(crate) rooms: HashMap<RoomId, LobbyRoomRecord>,
     pub(crate) create_room_dialog_open: bool,
     pub(crate) create_room_name_input: String,
 }
@@ -26,7 +27,7 @@ impl LobbyState {
     fn new(
         client_id: ClientId,
         chats: Vec<ChatRecord>,
-        rooms: HashMap<RoomId, RoomRecord>,
+        rooms: HashMap<RoomId, LobbyRoomRecord>,
     ) -> Self {
         Self {
             client_id,
@@ -45,6 +46,7 @@ struct RoomState {
     pub(crate) room_id: RoomId,
     pub(crate) chat_input: String,
     pub(crate) chats: Vec<ChatRecord>,
+    pub(crate) clients: HashMap<ClientId, RoomClientRecord>,
 }
 
 #[derive(Debug, Clone)]
@@ -180,14 +182,15 @@ impl App {
                     DownlinkMessage::LobbyEnterAck {
                         req_id,
                         success,
-                        chats,
-                        rooms,
+                        lobby_snapshot,
                     } => {
                         let client_id = going_to_lobby_state.client_id.unwrap();
                         if self.pending_matches(req_id) {
                             if success {
                                 self.change_state(ViewState::Lobby(LobbyState::new(
-                                    client_id, chats, rooms,
+                                    client_id,
+                                    lobby_snapshot.chats,
+                                    lobby_snapshot.rooms,
                                 )));
                             } else {
                                 todo!()
@@ -228,33 +231,40 @@ impl App {
                     DownlinkMessage::LobbyRoomUpdate { room_record } => {
                         lobby_state.rooms.insert(room_record.room_id, room_record);
                     }
-                    DownlinkMessage::LobbyCreateRoomAck { req_id, room_id } => {
-                        let client_id = lobby_state.client_id;
-                        if self.pending_matches(req_id)
-                            && let Some(room_id) = room_id
-                        {
-                            self.change_state(ViewState::Room(RoomState {
-                                client_id,
-                                room_id,
-                                chat_input: String::new(),
-                                chats: vec![],
-                            }));
-                        }
-                    }
-                    DownlinkMessage::RoomEnterAck {
+                    DownlinkMessage::LobbyCreateRoomAck {
                         req_id,
                         success,
-                        room_id,
-                        chats,
+                        room_snapshot,
                     } => {
                         let client_id = lobby_state.client_id;
                         if self.pending_matches(req_id) {
                             if success {
                                 self.change_state(ViewState::Room(RoomState {
                                     client_id,
-                                    room_id,
+                                    room_id: room_snapshot.room_id,
                                     chat_input: String::new(),
-                                    chats,
+                                    chats: room_snapshot.chats,
+                                    clients: room_snapshot.clients,
+                                }));
+                            } else {
+                                todo!()
+                            }
+                        }
+                    }
+                    DownlinkMessage::RoomEnterAck {
+                        req_id,
+                        success,
+                        room_snapshot,
+                    } => {
+                        let client_id = lobby_state.client_id;
+                        if self.pending_matches(req_id) {
+                            if success {
+                                self.change_state(ViewState::Room(RoomState {
+                                    client_id,
+                                    room_id: room_snapshot.room_id,
+                                    chat_input: String::new(),
+                                    chats: room_snapshot.chats,
+                                    clients: room_snapshot.clients,
                                 }));
                             } else {
                                 todo!()
@@ -349,7 +359,7 @@ impl App {
                     self.change_state(ViewState::Home);
                 }
                 NetworkTaskEvent::Recv(msg) => match msg {
-                    DownlinkMessage::RoomChat {
+                    DownlinkMessage::RoomChatUpdate {
                         room_id,
                         client_id,
                         username,
@@ -382,8 +392,15 @@ impl App {
             action = Some(UiAction::Disconnect);
         }
 
-        ui.label("Chat");
+        ui.label("Clients");
+        for client_record in room_state.clients.values() {
+            ui.label(format!(
+                "{} @ Team[{:?}]",
+                client_record.username, client_record.team
+            ));
+        }
 
+        ui.label("Chat");
         let response = ui.text_edit_singleline(&mut room_state.chat_input);
 
         if response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {

@@ -3,7 +3,10 @@ use std::collections::HashMap;
 use rustgo::{Coord, Stone};
 use serde::{Deserialize, Serialize};
 
-use crate::lobby::RoomRecord;
+use crate::{
+    lobby::{LobbyRoomRecord, LobbySnapshot},
+    room::{RoomClientAction, RoomClientRecord, RoomSnapshot},
+};
 
 pub type ClientId = u64;
 pub type RoomId = u64;
@@ -25,18 +28,18 @@ pub struct ChatRecord {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum DownlinkMessage {
-    /// respond by ClientActor
+    /// trigger by `Login`
     LoginAck {
         client_id: Option<ClientId>,
     },
+    /// trigger by `Ping`
     Pong,
 
     /// trigger by `LobbyEnter`
     LobbyEnterAck {
         req_id: ReqId,
         success: bool,
-        chats: Vec<ChatRecord>,
-        rooms: HashMap<RoomId, RoomRecord>,
+        lobby_snapshot: LobbySnapshot,
     },
 
     /// trigger by `LobbyChat`
@@ -45,21 +48,30 @@ pub enum DownlinkMessage {
     },
 
     LobbyRoomUpdate {
-        room_record: RoomRecord,
+        room_record: LobbyRoomRecord,
     },
 
+    /// trigger by `LobbyCreateRoom`
     LobbyCreateRoomAck {
         req_id: ReqId,
-        room_id: Option<RoomId>,
+        success: bool,
+        room_snapshot: RoomSnapshot,
     },
+
+    /// trigger by `RoomEnter`
     RoomEnterAck {
         req_id: ReqId,
         success: bool,
-        room_id: RoomId,
-        chats: Vec<ChatRecord>,
-        // TODO clients
+        room_snapshot: RoomSnapshot,
     },
-    RoomChat {
+
+    RoomClientUpdate {
+        action: RoomClientAction,
+        client_record: RoomClientRecord,
+    },
+
+    /// trigger by `RoomChat`
+    RoomChatUpdate {
         room_id: RoomId,
         client_id: ClientId,
         username: String,
@@ -70,29 +82,30 @@ pub enum DownlinkMessage {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum UplinkMessage {
     /// the first message after connection
-    /// handle by ClientActor
+    /// ClientActor respond `LoginAck`
     Login { username: String },
-    /// handle by ClientActor
+
+    /// ClientActor respond `Pong`
     Ping { client_id: ClientId, req_id: ReqId },
 
     /// if client in Void
-    /// - send `LobbyEnterAck`
-    /// - mark client in Lobby
+    /// - Lobby respond `LobbyEnterAck`
+    /// - Lobby mark client in Lobby
     LobbyEnter { client_id: ClientId, req_id: ReqId },
 
     /// if client in lobby, then
-    /// - record chat
-    /// - broadcast `LobbyChatUpdate`
+    /// - Lobby record chat
+    /// - Lobby broadcast `LobbyChatUpdate`
     LobbyChat {
         client_id: ClientId,
         content: String,
     },
 
     /// if client in lobby, then
-    /// - create Room with host=client
-    /// - mark client in Room
-    /// - send `LobbyCreateRoomAck`
-    /// - broadcast `LobbyRoomUpdate`
+    /// - Lobby create Room with host=client
+    /// - Lobby mark client in Room
+    /// - Lobby respond `LobbyCreateRoomAck`
+    /// - Lobby broadcast `LobbyRoomUpdate`
     LobbyCreateRoom {
         client_id: ClientId,
         req_id: ReqId,
@@ -100,19 +113,38 @@ pub enum UplinkMessage {
     },
 
     /// if client in lobby && has room, then
-    /// - mark client in Room
-    /// - send `RoomEnterAck`
-    /// - broadcast `LobbyRoomUpdate`
+    /// - Lobby mark client in Room
+    /// - Lobby broadcast `LobbyRoomUpdate`
+    /// - Room respond `RoomEnterAck`
+    /// - Room broadcast `RoomClientUpdate`
     RoomEnter {
         client_id: ClientId,
         req_id: ReqId,
         room_id: RoomId,
     },
+
+    /// if client in room && room.state==Teaming
+    /// - Room broadcast `RoomClientUpdate`
+    RoomChangeTeam {
+        client_id: ClientId,
+        req_id: ReqId,
+        room_id: RoomId,
+        team: Option<Stone>,
+    },
+
+    /// if client in room, then
+    /// - Room record chat
+    /// - Room broadcast `RoomChatUpdate`
     RoomChat {
         client_id: ClientId,
         room_id: RoomId,
         content: String,
     },
+
+    /// if client in room, then
+    /// - Lobby mark client in Void
+    /// - Lobby broadcast `LobbyRoomUpdate`
+    /// - Room broadcast `RoomClientUpdate`
     RoomQuit {
         client_id: ClientId,
         req_id: ReqId,

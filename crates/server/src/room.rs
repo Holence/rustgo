@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use log::error;
+use rustgo::Stone;
 use tokio::sync::mpsc;
 
 use crate::common::{ChatRecord, ClientId, DownlinkMessage, ReqId, RoomId};
@@ -8,27 +9,57 @@ use crate::common::{ChatRecord, ClientId, DownlinkMessage, ReqId, RoomId};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
-struct ClientRecord {
-    username: String,
-    team: u64,
+pub struct RoomClientRecord {
+    pub username: String,
+
+    /// each team corresponds to one type of Stone
+    ///
+    /// if `None`, then this client is not in any team, it is a Spectator
+    pub team: Option<Stone>,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub enum RoomClientAction {
+    Enter,
+    Change,
+    Quit,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub enum GameState {
+    Teaming,
+    Ongoing,  // TODO attach board state
+    Finished, // TODO attach board state
 }
 
 #[derive(Clone)]
 pub enum RoomMessage {
     Enter {
-        req_id: ReqId,
         client_id: ClientId,
+        req_id: ReqId,
         username: String,
         client_tx: mpsc::Sender<DownlinkMessage>,
     },
-    RoomChat {
+    ChangeTeam {
+        client_id: ClientId,
+        req_id: ReqId,
+        team: Option<Stone>,
+    },
+    Chat {
         client_id: ClientId,
         content: String,
     },
-    // TODO CreateTeam(PlayerId)
-    // TODO JoinTeam(PlayerId, TeamId)
-    // TODO LeaveTeam(PlayerId, TeamId)
     Quit(ClientId),
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct RoomSnapshot {
+    pub room_id: RoomId,
+    pub room_name: String,
+    pub host_id: ClientId,
+    pub state: GameState,
+    pub clients: HashMap<ClientId, RoomClientRecord>,
+    pub chats: Vec<ChatRecord>,
 }
 
 pub struct RoomActor {
@@ -36,8 +67,9 @@ pub struct RoomActor {
     room_id: RoomId,
     room_name: String,
     host_id: ClientId, // 房主
+    state: GameState,
 
-    clients: HashMap<ClientId, ClientRecord>,
+    clients: HashMap<ClientId, RoomClientRecord>,
     clients_tx: HashMap<ClientId, mpsc::Sender<DownlinkMessage>>,
 
     chats: Vec<ChatRecord>,
@@ -55,9 +87,9 @@ impl RoomActor {
         let mut clients = HashMap::new();
         clients.insert(
             host_id,
-            ClientRecord {
+            RoomClientRecord {
                 username: host_username,
-                team: 0,
+                team: None,
             },
         );
         let mut clients_tx = HashMap::new();
@@ -67,6 +99,7 @@ impl RoomActor {
             room_id,
             room_name,
             host_id,
+            state: GameState::Teaming,
             clients,
             clients_tx,
             chats: vec![],
@@ -91,12 +124,23 @@ impl RoomActor {
         }
     }
 
+    pub fn get_snapshot(&self) -> RoomSnapshot {
+        RoomSnapshot {
+            room_id: self.room_id,
+            room_name: self.room_name.clone(),
+            host_id: self.host_id,
+            state: self.state.clone(),
+            clients: self.clients.clone(),
+            chats: self.chats.clone(),
+        }
+    }
+
     pub async fn run(mut self) {
         while let Some(msg) = self.rx.recv().await {
             match msg {
                 RoomMessage::Enter {
-                    req_id,
                     client_id,
+                    req_id,
                     username,
                     client_tx,
                 } => {
@@ -106,8 +150,13 @@ impl RoomActor {
                     }
                     assert!(!self.clients_tx.contains_key(&client_id));
 
-                    self.clients
-                        .insert(client_id, ClientRecord { username, team: 0 });
+                    self.clients.insert(
+                        client_id,
+                        RoomClientRecord {
+                            username,
+                            team: None,
+                        },
+                    );
                     self.clients_tx.insert(client_id, client_tx);
 
                     self.send_to_client(
@@ -115,22 +164,28 @@ impl RoomActor {
                         DownlinkMessage::RoomEnterAck {
                             req_id,
                             success: true,
-                            room_id: self.room_id,
-                            chats: self.chats.clone(),
+                            room_snapshot: self.get_snapshot(),
                         },
                     )
                     .await;
 
-                    // TODO boardcast ClientRecord
+                    // TODO boardcast RoomClientUpdate
                 }
-                RoomMessage::RoomChat { client_id, content } => {
+                RoomMessage::ChangeTeam {
+                    client_id,
+                    req_id,
+                    team,
+                } => todo!(),
+                RoomMessage::Chat { client_id, content } => {
+                    // TODO ensure_client_in_room
+
                     self.chats.push(ChatRecord {
                         client_id,
                         username: self.client_username_cloned(client_id),
                         content: content.clone(),
                     });
 
-                    self.broadcast(DownlinkMessage::RoomChat {
+                    self.broadcast(DownlinkMessage::RoomChatUpdate {
                         room_id: self.room_id,
                         client_id,
                         username: self.client_username_cloned(client_id),
@@ -139,8 +194,12 @@ impl RoomActor {
                     .await;
                 }
                 RoomMessage::Quit(client_id) => {
-                    self.clients.remove(&client_id).unwrap();
-                    self.clients_tx.remove(&client_id).unwrap();
+                    // TODO ensure_client_in_room
+
+                    self.clients.remove(&client_id);
+                    self.clients_tx.remove(&client_id);
+
+                    // TODO boardcast RoomClientUpdate
                 }
             }
         }
