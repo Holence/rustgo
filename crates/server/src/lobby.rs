@@ -19,7 +19,7 @@ enum ClientLocation {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 struct ClientRecord {
     location: ClientLocation,
-    // name
+    username: String,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -31,11 +31,9 @@ pub struct RoomRecord {
 }
 
 pub enum LobbyMessage {
-    /// send by client when connection established
-    /// - sned `Greeting`
-    /// - mark client in Void
     RegisterClient {
-        client_id_tx: oneshot::Sender<ClientId>,
+        username: String,
+        client_id_tx: oneshot::Sender<Option<ClientId>>,
         client_tx: mpsc::Sender<DownlinkMessage>,
     },
     UnregisterClient {
@@ -107,6 +105,10 @@ impl LobbyActor {
         self.clients_tx.get(&client_id).unwrap().clone()
     }
 
+    fn client_username_cloned(&self, client_id: ClientId) -> String {
+        self.clients.get(&client_id).unwrap().username.clone()
+    }
+
     async fn send_to_client(&self, client_id: ClientId, msg: DownlinkMessage) {
         self.clients_tx
             .get(&client_id)
@@ -136,6 +138,7 @@ impl LobbyActor {
 
     async fn handle_msg(&mut self, msg: UplinkMessage) {
         match msg {
+            UplinkMessage::Login { .. } => unreachable!(),
             UplinkMessage::Ping { client_id, req_id } => todo!(),
             UplinkMessage::LobbyEnter { client_id, req_id } => {
                 if !self.ensure_client_location(client_id, ClientLocation::Void) {
@@ -162,7 +165,11 @@ impl LobbyActor {
                 }
 
                 info!("client[{client_id}] says '{content}'");
-                let chat_record = ChatRecord { client_id, content };
+                let chat_record = ChatRecord {
+                    client_id,
+                    username: self.client_username_cloned(client_id),
+                    content,
+                };
                 self.chats.push(chat_record.clone());
                 self.broadcast(DownlinkMessage::LobbyChatUpdate { chat_record })
                     .await;
@@ -186,6 +193,7 @@ impl LobbyActor {
                         room_id,
                         room_name.clone(),
                         client_id,
+                        self.client_username_cloned(client_id),
                         self.client_tx_cloned(client_id),
                     )
                     .run(),
@@ -236,6 +244,7 @@ impl LobbyActor {
                     RoomMessage::Enter {
                         req_id,
                         client_id,
+                        username: self.client_username_cloned(client_id),
                         client_tx: self.client_tx_cloned(client_id),
                     },
                 )
@@ -268,12 +277,23 @@ impl LobbyActor {
         while let Some(msg) = self.rx.recv().await {
             match msg {
                 LobbyMessage::RegisterClient {
+                    username,
                     client_id_tx,
                     client_tx,
                 } => {
+                    if username.is_empty() {
+                        client_id_tx.send(None).unwrap();
+                        error!("username is empty");
+                        continue;
+                    }
+                    if self.clients.values().any(|c| c.username == username) {
+                        client_id_tx.send(None).unwrap();
+                        error!("username='{}' already exists", username);
+                        continue;
+                    }
+
                     let client_id = self.next_client_id;
                     self.next_client_id += 1;
-
                     // safe check
                     if self.clients.contains_key(&client_id) {
                         error!("client[{}] already exists", client_id);
@@ -285,15 +305,12 @@ impl LobbyActor {
                         client_id,
                         ClientRecord {
                             location: ClientLocation::Void,
+                            username,
                         },
                     );
                     self.clients_tx.insert(client_id, client_tx.clone());
 
-                    client_id_tx.send(client_id).unwrap();
-                    client_tx
-                        .send(DownlinkMessage::Greeting { client_id })
-                        .await
-                        .unwrap();
+                    client_id_tx.send(Some(client_id)).unwrap();
                 }
                 LobbyMessage::UnregisterClient { client_id } => {
                     let Some(client_record) = self.clients.remove(&client_id) else {

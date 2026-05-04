@@ -19,14 +19,15 @@ pub enum Action {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct ChatRecord {
     pub client_id: ClientId,
+    pub username: String,
     pub content: String,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum DownlinkMessage {
-    /// trigger by `RegisterClient`
-    Greeting {
-        client_id: ClientId,
+    /// respond by ClientActor
+    LoginAck {
+        client_id: Option<ClientId>,
     },
     Pong,
 
@@ -61,27 +62,23 @@ pub enum DownlinkMessage {
     RoomChat {
         room_id: RoomId,
         client_id: ClientId,
+        username: String,
         content: String,
     },
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum UplinkMessage {
-    // TODO Login {
-    //     client_id: String,
-    // },
-    Ping {
-        client_id: ClientId,
-        req_id: ReqId,
-    },
+    /// the first message after connection
+    /// handle by ClientActor
+    Login { username: String },
+    /// handle by ClientActor
+    Ping { client_id: ClientId, req_id: ReqId },
 
     /// if client in Void
     /// - send `LobbyEnterAck`
     /// - mark client in Lobby
-    LobbyEnter {
-        client_id: ClientId,
-        req_id: ReqId,
-    },
+    LobbyEnter { client_id: ClientId, req_id: ReqId },
 
     /// if client in lobby, then
     /// - record chat

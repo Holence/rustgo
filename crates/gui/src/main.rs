@@ -9,7 +9,12 @@ use tokio::sync::mpsc;
 use eframe::egui::{self};
 
 #[derive(Default, Debug, Clone)]
+struct GoingToLobbyState {
+    client_id: Option<ClientId>,
+}
+#[derive(Default, Debug, Clone)]
 struct LobbyState {
+    pub(crate) client_id: ClientId,
     pub(crate) chat_input: String,
     pub(crate) chats: Vec<ChatRecord>,
     pub(crate) rooms: HashMap<RoomId, RoomRecord>,
@@ -18,8 +23,13 @@ struct LobbyState {
 }
 
 impl LobbyState {
-    fn new(chats: Vec<ChatRecord>, rooms: HashMap<RoomId, RoomRecord>) -> Self {
+    fn new(
+        client_id: ClientId,
+        chats: Vec<ChatRecord>,
+        rooms: HashMap<RoomId, RoomRecord>,
+    ) -> Self {
         Self {
+            client_id,
             chat_input: String::new(),
             chats,
             rooms,
@@ -31,6 +41,7 @@ impl LobbyState {
 
 #[derive(Default, Debug, Clone)]
 struct RoomState {
+    pub(crate) client_id: ClientId,
     pub(crate) room_id: RoomId,
     pub(crate) chat_input: String,
     pub(crate) chats: Vec<ChatRecord>,
@@ -39,7 +50,7 @@ struct RoomState {
 #[derive(Debug, Clone)]
 enum ViewState {
     Home,
-    GoingToLobby,
+    GoingToLobby(GoingToLobbyState),
     Lobby(LobbyState),
     Room(RoomState),
 }
@@ -64,7 +75,7 @@ pub struct App {
     state: ViewState,
     pending: Option<Pending>,
     next_req_id: ReqId,
-    client_id: Option<ClientId>,
+    username_input: String,
 
     tx_cmd: mpsc::UnboundedSender<NetworkTaskCmd>,
     rx_msg: mpsc::UnboundedReceiver<NetworkTaskEvent>,
@@ -79,7 +90,7 @@ impl App {
             state: ViewState::Home,
             pending: None,
             next_req_id: 1,
-            client_id: None,
+            username_input: String::new(),
             tx_cmd,
             rx_msg,
         }
@@ -125,7 +136,10 @@ impl App {
         if let Ok(event) = self.rx_msg.try_recv() {
             match event {
                 NetworkTaskEvent::Connected => {
-                    self.change_state(ViewState::GoingToLobby);
+                    self.change_state(ViewState::GoingToLobby(GoingToLobbyState::default()));
+                    self.send(UplinkMessage::Login {
+                        username: self.username_input.trim().to_string(),
+                    });
                 }
                 _ => unreachable!("{:?}", event),
             }
@@ -136,6 +150,8 @@ impl App {
         let mut action: Option<UiAction> = None;
         ui.heading("Home");
         ui.separator();
+        ui.label("Username");
+        ui.text_edit_singleline(&mut self.username_input);
 
         if ui.button("Connect").clicked() {
             action = Some(UiAction::Connect);
@@ -144,17 +160,22 @@ impl App {
     }
 
     fn handle_going_to_lobby(&mut self) {
+        let ViewState::GoingToLobby(going_to_lobby_state) = &mut self.state else {
+            unreachable!("{:?}", self.state)
+        };
+
         if let Ok(event) = self.rx_msg.try_recv() {
             match event {
                 NetworkTaskEvent::Disconnected => {
                     self.change_state(ViewState::Home);
                 }
                 NetworkTaskEvent::Recv(msg) => match msg {
-                    DownlinkMessage::Greeting { client_id } => {
-                        self.client_id = Some(client_id);
-
-                        let req_id = self.next_req("Going To Lobby".to_string());
-                        self.send(UplinkMessage::LobbyEnter { client_id, req_id });
+                    DownlinkMessage::LoginAck { client_id } => {
+                        if let Some(client_id) = client_id {
+                            going_to_lobby_state.client_id = Some(client_id);
+                            let req_id = self.next_req("Going To Lobby".to_string());
+                            self.send(UplinkMessage::LobbyEnter { client_id, req_id });
+                        }
                     }
                     DownlinkMessage::LobbyEnterAck {
                         req_id,
@@ -162,9 +183,12 @@ impl App {
                         chats,
                         rooms,
                     } => {
+                        let client_id = going_to_lobby_state.client_id.unwrap();
                         if self.pending_matches(req_id) {
                             if success {
-                                self.change_state(ViewState::Lobby(LobbyState::new(chats, rooms)));
+                                self.change_state(ViewState::Lobby(LobbyState::new(
+                                    client_id, chats, rooms,
+                                )));
                             } else {
                                 todo!()
                             }
@@ -178,8 +202,12 @@ impl App {
     }
 
     fn ui_going_to_lobby(&mut self, ui: &mut egui::Ui) -> Option<UiAction> {
+        let ViewState::GoingToLobby(going_to_lobby_state) = &self.state else {
+            unreachable!("{:?}", self.state)
+        };
+
         let action: Option<UiAction> = None;
-        ui.label(format!("client_id: {:?}", self.client_id));
+        ui.label(format!("client_id: {:?}", going_to_lobby_state.client_id));
         return action;
     }
 
@@ -201,10 +229,12 @@ impl App {
                         lobby_state.rooms.insert(room_record.room_id, room_record);
                     }
                     DownlinkMessage::LobbyCreateRoomAck { req_id, room_id } => {
+                        let client_id = lobby_state.client_id;
                         if self.pending_matches(req_id)
                             && let Some(room_id) = room_id
                         {
                             self.change_state(ViewState::Room(RoomState {
+                                client_id,
                                 room_id,
                                 chat_input: String::new(),
                                 chats: vec![],
@@ -217,9 +247,11 @@ impl App {
                         room_id,
                         chats,
                     } => {
+                        let client_id = lobby_state.client_id;
                         if self.pending_matches(req_id) {
                             if success {
                                 self.change_state(ViewState::Room(RoomState {
+                                    client_id,
                                     room_id,
                                     chat_input: String::new(),
                                     chats,
@@ -244,7 +276,7 @@ impl App {
         let mut action: Option<UiAction> = None;
         ui.heading("Lobby");
         ui.separator();
-        ui.label(format!("client_id: {}", self.client_id.unwrap()));
+        ui.label(format!("client_id: {}", lobby_state.client_id));
         if ui.button("Disconnect").clicked() {
             action = Some(UiAction::Disconnect);
         }
@@ -265,8 +297,8 @@ impl App {
 
         for chat_record in &lobby_state.chats {
             ui.label(format!(
-                "client[{}]: {}",
-                chat_record.client_id, chat_record.content
+                "{} (client[{}]): {}",
+                chat_record.username, chat_record.client_id, chat_record.content
             ));
         }
 
@@ -320,10 +352,15 @@ impl App {
                     DownlinkMessage::RoomChat {
                         room_id,
                         client_id,
+                        username,
                         content,
                     } => {
                         assert!(room_id == room_state.room_id);
-                        room_state.chats.push(ChatRecord { client_id, content });
+                        room_state.chats.push(ChatRecord {
+                            client_id,
+                            username,
+                            content,
+                        });
                     }
                     _ => unreachable!("{:?}", msg),
                 },
@@ -340,7 +377,7 @@ impl App {
         let mut action: Option<UiAction> = None;
         ui.heading(format!("Room[{}]", room_state.room_id));
         ui.separator();
-        ui.label(format!("client_id: {}", self.client_id.unwrap()));
+        ui.label(format!("client_id: {}", room_state.client_id));
         if ui.button("Disconnect").clicked() {
             action = Some(UiAction::Disconnect);
         }
@@ -358,8 +395,8 @@ impl App {
 
         for chat_record in &room_state.chats {
             ui.label(format!(
-                "client[{}]: {}",
-                chat_record.client_id, chat_record.content
+                "{} (client[{}]): {}",
+                chat_record.username, chat_record.client_id, chat_record.content
             ));
         }
 
@@ -376,17 +413,18 @@ impl App {
                 self.disconnect();
             }
 
-            (ViewState::Lobby(_), UiAction::SendLobbyChat(content)) => {
+            (ViewState::Lobby(lobby_state), UiAction::SendLobbyChat(content)) => {
                 self.send(UplinkMessage::LobbyChat {
-                    client_id: self.client_id.unwrap(),
+                    client_id: lobby_state.client_id,
                     content,
                 });
             }
 
-            (ViewState::Lobby(_), UiAction::CreateRoom(room_name)) => {
+            (ViewState::Lobby(lobby_state), UiAction::CreateRoom(room_name)) => {
+                let client_id = lobby_state.client_id;
                 let req_id = self.next_req("Create Room".to_string());
                 self.send(UplinkMessage::LobbyCreateRoom {
-                    client_id: self.client_id.unwrap(),
+                    client_id,
                     req_id,
                     room_name,
                 });
@@ -394,16 +432,17 @@ impl App {
 
             (ViewState::Room(room_state), UiAction::SendRoomChat(content)) => {
                 self.send(UplinkMessage::RoomChat {
-                    client_id: self.client_id.unwrap(),
+                    client_id: room_state.client_id,
                     room_id: room_state.room_id,
                     content,
                 });
             }
 
-            (ViewState::Lobby(_), UiAction::EnterRoom(room_id)) => {
+            (ViewState::Lobby(lobby_state), UiAction::EnterRoom(room_id)) => {
+                let client_id = lobby_state.client_id;
                 let req_id = self.next_req("Enter Room".to_string());
                 self.send(UplinkMessage::RoomEnter {
-                    client_id: self.client_id.unwrap(),
+                    client_id,
                     req_id,
                     room_id,
                 });
@@ -423,7 +462,7 @@ impl eframe::App for App {
         // -------------------------
         match &mut self.state {
             ViewState::Home => self.handle_home(),
-            ViewState::GoingToLobby => self.handle_going_to_lobby(),
+            ViewState::GoingToLobby(_) => self.handle_going_to_lobby(),
             ViewState::Lobby(_) => self.handle_lobby(),
             ViewState::Room(_) => self.handle_room(),
         }
@@ -440,7 +479,7 @@ impl eframe::App for App {
 
             action = match &self.state {
                 ViewState::Home => self.ui_home(ui),
-                ViewState::GoingToLobby => self.ui_going_to_lobby(ui),
+                ViewState::GoingToLobby(_) => self.ui_going_to_lobby(ui),
                 ViewState::Lobby(_) => self.ui_lobby(ui),
                 ViewState::Room(_) => self.ui_room(ui),
             }

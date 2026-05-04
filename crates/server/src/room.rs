@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 struct ClientRecord {
-    // name
+    username: String,
     team: u64,
 }
 
@@ -18,6 +18,7 @@ pub enum RoomMessage {
     Enter {
         req_id: ReqId,
         client_id: ClientId,
+        username: String,
         client_tx: mpsc::Sender<DownlinkMessage>,
     },
     RoomChat {
@@ -48,10 +49,17 @@ impl RoomActor {
         room_id: RoomId,
         room_name: String,
         host_id: ClientId,
+        host_username: String,
         host_tx: mpsc::Sender<DownlinkMessage>,
     ) -> Self {
         let mut clients = HashMap::new();
-        clients.insert(host_id, ClientRecord { team: 0 });
+        clients.insert(
+            host_id,
+            ClientRecord {
+                username: host_username,
+                team: 0,
+            },
+        );
         let mut clients_tx = HashMap::new();
         clients_tx.insert(host_id, host_tx);
         Self {
@@ -63,6 +71,10 @@ impl RoomActor {
             clients_tx,
             chats: vec![],
         }
+    }
+
+    fn client_username_cloned(&self, client_id: ClientId) -> String {
+        self.clients.get(&client_id).unwrap().username.clone()
     }
 
     async fn send_to_client(&self, client_id: ClientId, msg: DownlinkMessage) {
@@ -85,6 +97,7 @@ impl RoomActor {
                 RoomMessage::Enter {
                     req_id,
                     client_id,
+                    username,
                     client_tx,
                 } => {
                     if self.clients.contains_key(&client_id) {
@@ -93,7 +106,8 @@ impl RoomActor {
                     }
                     assert!(!self.clients_tx.contains_key(&client_id));
 
-                    self.clients.insert(client_id, ClientRecord { team: 0 });
+                    self.clients
+                        .insert(client_id, ClientRecord { username, team: 0 });
                     self.clients_tx.insert(client_id, client_tx);
 
                     self.send_to_client(
@@ -112,12 +126,14 @@ impl RoomActor {
                 RoomMessage::RoomChat { client_id, content } => {
                     self.chats.push(ChatRecord {
                         client_id,
+                        username: self.client_username_cloned(client_id),
                         content: content.clone(),
                     });
 
                     self.broadcast(DownlinkMessage::RoomChat {
                         room_id: self.room_id,
                         client_id,
+                        username: self.client_username_cloned(client_id),
                         content,
                     })
                     .await;
