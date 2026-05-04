@@ -32,8 +32,8 @@ async fn main() {
     loop {
         let (stream, addr) = listener.accept().await.unwrap();
         info!("{} connected", addr);
-        let client_actor = ClientActor::new(stream, addr);
-        tokio::spawn(client_actor.run(lobby_tx.clone()));
+        let client_actor = ClientActor::new(stream, addr, lobby_tx.clone());
+        tokio::spawn(client_actor.run());
     }
     // ctrl+c drop(lobby_tx);
 }
